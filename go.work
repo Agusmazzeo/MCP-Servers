@@ -1,0 +1,7 @@
+go 1.24.11
+
+use (
+	./shared
+	./services/zencrm
+	./services/allfunds
+)

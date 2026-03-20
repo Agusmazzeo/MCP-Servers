@@ -1,0 +1,361 @@
+[
+  {
+    "name": "search_funds",
+    "description": "Buscar fondos, ETPs o instrumentos financieros en Allfunds Connect. Puede buscar por nombre, ISIN o ticker. Devuelve NAV, performance, divisa, riesgo (SRI), ESG y más.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string",
+          "description": "Nombre del fondo, ISIN (ej: LU0823421333) o ticker"
+        },
+        "page": {
+          "type": "integer",
+          "description": "Número de página (default 1)",
+          "default": 1
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Resultados por página (default 10, máx 50)",
+          "default": 10
+        },
+        "available_in_allfunds": {
+          "type": "boolean",
+          "description": "Filtrar solo fondos disponibles en Allfunds (default false)"
+        },
+        "sfdr_article": {
+          "type": "string",
+          "enum": ["article_8", "article_9"],
+          "description": "Filtrar por clasificación SFDR"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Filtrar por divisa (ej: USD, EUR)"
+        },
+        "sort_field": {
+          "type": "string",
+          "enum": ["name", "performance_ytd", "latest_nav"],
+          "description": "Campo de ordenación (default: name)"
+        },
+        "sort_direction": {
+          "type": "string",
+          "enum": ["asc", "desc"],
+          "description": "Dirección de ordenación (default: asc)"
+        }
+      },
+      "required": ["search"]
+    }
+  },
+  {
+    "name": "get_current_user",
+    "description": "Obtener información del usuario autenticado en Allfunds Connect (nombre, email, entidad, permisos).",
+    "input_schema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "list_watchlists",
+    "description": "Listar las watchlists (listas de fondos) del usuario en Allfunds Connect.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "integer",
+          "description": "Número de página (default 1)",
+          "default": 1
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Resultados por página (default 20)",
+          "default": 20
+        }
+      }
+    }
+  },
+  {
+    "name": "get_pinned_watchlist",
+    "description": "Obtener la watchlist fijada (pinned) del usuario.",
+    "input_schema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "get_fund_insights",
+    "description": "Obtener artículos y noticias de fondos de Allfunds Connect (Fund Insights). Puede filtrar por hashtags, regiones, tipos de artículo o palabras clave.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string",
+          "description": "Búsqueda por título o contenido"
+        },
+        "hashtags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Filtrar por hashtags"
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Filtrar por regiones"
+        },
+        "page": {
+          "type": "integer",
+          "description": "Número de página (default 1)",
+          "default": 1
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Resultados por página (default 10)",
+          "default": 10
+        }
+      }
+    }
+  },
+  {
+    "name": "get_watchlist_funds",
+    "description": "Ver los fondos dentro de una watchlist específica de Allfunds Connect. Usar el ID obtenido con list_watchlists.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "watchlist_id": {
+          "type": "string",
+          "description": "ID de la watchlist (ej: '19438')"
+        },
+        "page": {
+          "type": "integer",
+          "description": "Número de página (default 1)",
+          "default": 1
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Resultados por página (default 25)",
+          "default": 25
+        },
+        "search": {
+          "type": "string",
+          "description": "Filtrar por nombre dentro de la watchlist"
+        }
+      },
+      "required": ["watchlist_id"]
+    }
+  },
+  {
+    "name": "login_status",
+    "description": "Verificar el estado de autenticación con Allfunds Connect y reconectarse si es necesario.",
+    "input_schema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "get_fund_detail",
+    "description": "Obtener el detalle completo de un fondo por ISIN. Incluye: info del fondo (gestor, domicilio, estructura legal, UCITS, hedged, estilo de gestión), categoría Allfunds y Morningstar, AUM (fondo y clase), costos (OCF, management fee, performance fee, suscripción, reembolso), benchmark, ESG (SFDR, Morningstar ESG, estrella rating), distribución de ganancias, exposición por regiones, objetivo de inversión, mínimo de inversión inicial, clases de participación, gestores.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN del fondo (ej: IE00B7KFL990)"
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "get_fund_performance",
+    "description": "Obtener la performance completa de un fondo por ISIN. Incluye: YTD (año en curso), retorno anual por año (histórico completo), retornos acumulados a 1, 3 y 5 años, y retornos mensuales si están disponibles. Ideal para ver cómo le fue a un fondo en 2024, 2025, 2026 o en cualquier período.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN del fondo (ej: IE00B7KFL990)"
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "get_fund_ratios",
+    "description": "Obtener los ratios de riesgo/retorno de un fondo por ISIN. Incluye por período (1 año, 3 años, 5 años): sharpe ratio, volatilidad, máximo drawdown, beta, alfa, información ratio, tracking error y más. Usar para análisis de riesgo o comparación de fondos.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN del fondo (ej: IE00B7KFL990)"
+        },
+        "period": {
+          "type": "string",
+          "enum": ["one_year", "three_years", "five_years", "all"],
+          "description": "Período de análisis (default: all — devuelve todos)",
+          "default": "all"
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "get_fund_documents",
+    "description": "Obtener los documentos disponibles de un fondo por ISIN. Incluye KIID, prospecto, informes anuales, informes semestrales y otros documentos regulatorios. Devuelve URL de descarga, tipo de documento, fecha e idioma.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN del fondo (ej: IE00B7KFL990)"
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Número de documentos a obtener (default 50)",
+          "default": 50
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "get_fund_share_classes",
+    "description": "Obtener todas las clases de participación (share classes) de un fondo por ISIN. Devuelve el ISIN, nombre y divisa de cada clase disponible en Allfunds.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN de cualquier clase del fondo"
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "compare_funds_performance",
+    "description": "Comparar la performance de dos o más fondos por ISIN. Devuelve para cada fondo: retorno por año (histórico completo), YTD del año en curso, retornos acumulados a 1/3/5 años, divisa, gestor y último NAV. Ideal para comparaciones del tipo 'PIMCO Income vs Neuberger Berman Strategic Income' en 2024, 2025, 2026.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "isins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Lista de ISINs a comparar, ej: ['IE00B7KFL990', 'IE00B87L2R26']"
+        }
+      },
+      "required": ["isins"]
+    }
+  },
+  {
+    "name": "get_fund_portfolio",
+    "description": "Obtener el desglose de portfolio de un fondo por ISIN. Incluye: asset allocation neto, exposición regional, exposición por divisa, distribución por sectores, distribución por calidad crediticia (rating), exposición por países, y top holdings (activos principales). Útil para preguntas como '¿cómo está alocado por sectores/países/crédito/divisa?' o '¿cuáles son los principales holdings?'",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN del fondo"
+        },
+        "top_size": {
+          "type": "integer",
+          "description": "Número de top holdings a devolver (default 10)",
+          "default": 10
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "get_fund_nav_history",
+    "description": "Obtener el historial de NAV (precio de cierre diario) de un fondo por ISIN. Permite consultar la evolución de precios en un rango de fechas o los últimos N valores. También devuelve dividendos y splits si los hay. Útil para gráficos de evolución de precio o para ver el NAV en períodos específicos.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN del fondo (ej: IE00BV1VS594)"
+        },
+        "since_date": {
+          "type": "string",
+          "description": "Fecha de inicio en formato YYYY-MM-DD (ej: '2024-01-01')"
+        },
+        "until_date": {
+          "type": "string",
+          "description": "Fecha de fin en formato YYYY-MM-DD (ej: '2024-12-31'). Por defecto hoy."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Límite de precios a devolver (default 252 = ~1 año de trading)",
+          "default": 252
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "get_fund_nav_on_date",
+    "description": "Obtener el NAV (precio de cierre) de un fondo en una fecha específica o el más cercano disponible. Si no hay precio exacto para esa fecha, devuelve el precio del día hábil más próximo anterior. Ideal para preguntas como '¿cuánto valía el fondo X el 15 de marzo de 2024?'",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN del fondo (ej: IE00BV1VS594)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Fecha en formato YYYY-MM-DD (ej: '2024-03-15')"
+        }
+      },
+      "required": ["isin", "date"]
+    }
+  },
+  {
+    "name": "get_fund_managers",
+    "description": "Obtener la lista de gestores (portfolio managers) de un fondo por ISIN. Devuelve nombre, apellido, fecha de inicio y fecha de fin de cada gestor. Útil para saber quién gestiona el fondo actualmente y cuándo empezó.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN del fondo (ej: IE00BV1VS594)"
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "get_similar_funds",
+    "description": "Obtener fondos similares o alternativos a un fondo dado por ISIN. Devuelve fondos de la misma categoría con su performance, ratios, OCF y último NAV. Útil para comparar alternativas o encontrar competidores directos de un fondo.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN del fondo de referencia (ej: IE00BV1VS594)"
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "download_document",
+    "description": "Descarga un documento de Allfunds (PDF u otro) usando la sesión autenticada y lo guarda en disco. Usar con URLs de documentos obtenidas de get_fund_documents.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "URL del documento a descargar (de app.allfunds.com)"
+        }
+      },
+      "required": ["url"]
+    }
+  }
+]

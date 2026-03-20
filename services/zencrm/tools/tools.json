@@ -1,0 +1,3084 @@
+[
+  {
+    "name": "login",
+    "description": "Authenticate with ZenCRM. This tool has TWO authentication modes:\n\n🔐 OAUTH MODE (Recommended - Automatic):\n   When OAuth is configured in Claude Desktop settings, authentication is AUTOMATIC.\n   You DO NOT need to call this tool - all tools work immediately!\n   \n   How it works:\n   1. User sets up OAuth once in Claude Desktop (browser login)\n   2. OAuth creates a session with client_id in Redis (30-day TTL)\n   3. MCP server automatically retrieves your JWT token from the API using GET /api/v1/mcp/sessions/{client_id}\n   4. All tools work automatically with this token\n   5. When tokens expire, Claude Desktop automatically renews them using refresh tokens (no user action needed!)\n   \n   Benefits:\n   - No credentials needed in chat\n   - Survives server restarts (stored in Redis)\n   - Secure OAuth 2.0 flow with PKCE\n   - Automatic token renewal when expired\n   - All tools work immediately after OAuth setup\n\n📧 MANUAL MODE (Fallback):\n   Only use this if OAuth is NOT configured (stdio mode or testing).\n   Requires email and password to authenticate.\n   \n   When to use:\n   - Running in stdio mode without OAuth\n   - OAuth not configured in Claude Desktop\n   - Testing/debugging purposes\n\n⚠️  If you see \"authentication required\" errors with OAuth configured, something is wrong.\n    The OAuth session should provide automatic authentication.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The user's email address for CRM login (only for non-OAuth mode)"
+        },
+        "password": {
+          "type": "string",
+          "description": "The user's password for CRM login (only for non-OAuth mode)"
+        }
+      },
+      "required": ["email", "password"]
+    }
+  },
+  {
+    "name": "list_users",
+    "description": "Search and list users in the CRM by first name, last name, email, or phone. Supports partial/fuzzy matching on all search fields. Use for queries like 'find users named John', 'show me users with email gmail', 'list users with phone 555'.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "searchFirstName": {
+          "type": "string",
+          "description": "Search by first name - partial matching (case-insensitive). Example: 'john' matches 'John', 'Johnny', 'Johnathan'. Use this for queries about first names."
+        },
+        "searchLastName": {
+          "type": "string",
+          "description": "Search by last name - partial matching (case-insensitive). Example: 'smith' matches 'Smith', 'Smithson', 'Blacksmith'. Use this for queries about last names or surnames."
+        },
+        "searchEmail": {
+          "type": "string",
+          "description": "Search by email - partial matching (case-insensitive). Example: 'gmail' matches all Gmail users, 'john.doe' matches 'john.doe@company.com'. Use for email queries."
+        },
+        "searchPhone": {
+          "type": "string",
+          "description": "Search by phone number - partial matching. Example: '555' matches any phone with '555'. Use for phone number queries."
+        },
+        "sortBy": {
+          "type": "string",
+          "description": "Sort results by field. Valid values: 'id', 'firstName', 'lastName', 'email'. Default is 'id'."
+        },
+        "sortOrder": {
+          "type": "string",
+          "description": "Sort direction. Valid values: 'asc' (ascending) or 'desc' (descending). Default is 'desc'."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum results to return. Default is 10. Use 50-100 when user asks for 'all' or many results."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Skip this many results for pagination. Default is 0."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_user",
+    "description": "Retrieves detailed information about a specific user by their ID. Returns user profile including name, email, role, and permissions.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "The unique identifier of the user to retrieve"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "create_user",
+    "description": "Creates a new user in the CRM system. Requires user creation permissions. IMPORTANT: Before creating a user, call list_roles to see available roleId values. Use this when onboarding new team members.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address (must be unique and valid format)"
+        },
+        "username": {
+          "type": "string",
+          "description": "Username (must be unique, 3-50 characters). Should follow format: firstName.lastName"
+        },
+        "password": {
+          "type": "string",
+          "description": "Password for the user account (minimum 6 characters)"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the user"
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the user"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Optional phone number"
+        },
+        "avatarImage": {
+          "type": "string",
+          "description": "Optional avatar image URL"
+        },
+        "userStatusId": {
+          "type": "integer",
+          "description": "User status ID. Common values: 1 (active), 2 (inactive), 3 (pending). Use 1 for active users by default."
+        },
+        "roleId": {
+          "type": "integer",
+          "description": "ID of the role to assign to this user. Use list_roles first to see available roles and their IDs."
+        }
+      },
+      "required": [
+        "email",
+        "username",
+        "password",
+        "firstName",
+        "lastName",
+        "userStatusId",
+        "roleId"
+      ]
+    }
+  },
+  {
+    "name": "list_roles",
+    "description": "Retrieves all user roles in the system. Use this when creating users to see available roles, or when managing role-based permissions.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of roles to return. Default is 10."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number of roles to skip for pagination. Default is 0."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_role",
+    "description": "Retrieves details about a specific role including its permissions and level.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "The unique identifier of the role"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "create_role",
+    "description": "Creates a new role in the system. Requires role creation permissions. Use this to add new permission levels for users.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the role (3-50 characters). Examples: 'Manager', 'Sales Representative', 'Administrator'"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description explaining the role's purpose and responsibilities"
+        },
+        "level": {
+          "type": "integer",
+          "description": "Access level of the role (0 or higher). Higher levels typically have more permissions. Default is 0."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the role is active and can be assigned. Default is true."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "update_user",
+    "description": "Updates an existing user's information. All fields are optional - only provide fields you want to update.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the user to update"
+        },
+        "name": {
+          "type": "string",
+          "description": "New name for the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "New email for the user"
+        },
+        "roleId": {
+          "type": "integer",
+          "description": "New role ID to assign"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the user account is active"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "list_client_types",
+    "description": "Retrieves all available client types in the system with their IDs. CRITICAL: You MUST call this tool FIRST whenever the user mentions a type NAME in their query (e.g., 'Prospect', 'Customer', 'Partner', 'Lead') to look up the type ID. NEVER guess type IDs! Common triggers: 'prospect clients', 'customer clients', 'clientes tipo prospecto', 'show me all partners'. Workflow: User says 'todos los clientes tipo prospecto' → 1) Call THIS tool to get all types, 2) Search response for 'Prospect' to find its ID (e.g., ID=3), 3) Call list_clients with filterTypeIds='3' AND limit=200. Also call this when creating clients to get valid type IDs. This tool returns the mapping between type names and IDs - use it to translate user's type names into IDs for filtering.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of types to return. Default is 50."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number of types to skip for pagination. Default is 0."
+        },
+        "sortBy": {
+          "type": "string",
+          "description": "Sort results by field. Valid values: 'name', 'id'. Default is 'name'."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "list_client_statuses",
+    "description": "Retrieves all available client statuses in the system. Use this during initial setup to understand valid status values. Statuses represent the relationship stage with a client (e.g., prospect, active, inactive).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of statuses to return. Default is 50."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number of statuses to skip for pagination. Default is 0."
+        },
+        "sortBy": {
+          "type": "string",
+          "description": "Sort results by field. Valid values: 'name', 'id'. Default is 'name'."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "list_client_categories",
+    "description": "Retrieves all available client categories in the system with their IDs. CRITICAL: You MUST call this tool FIRST whenever the user mentions a category NAME in their query (e.g., 'Off Shore', 'High Net Worth', 'Institutional', 'Retail') to look up the category ID. NEVER guess category IDs! Common triggers: 'clientes off shore', 'high net worth clients', 'institutional clients', 'todos los clientes de categoría X'. Workflow: User says 'todos los clientes off shore' → 1) Call THIS tool to get all categories, 2) Search response for 'Off Shore' to find its ID (e.g., ID=5), 3) Call list_clients with filterCategoryIds='5' AND limit=200. This tool returns the mapping between category names and IDs - use it to translate user's category names into IDs for filtering.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of categories to return. Default is 50. Use higher values if you have many categories."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number of categories to skip for pagination. Default is 0."
+        },
+        "sortBy": {
+          "type": "string",
+          "description": "Sort by field. Common values might include 'name', 'displayOrder', 'id'. Optional parameter."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "list_clients_summary",
+    "description": "TOKEN OPTIMIZATION: Returns a lightweight summary list of clients with only ID and name fields (minimal token usage). Use this FIRST when user requests basic listings, counts, or when you need to check dataset size before deciding whether to use full data or exports. CRITICAL WORKFLOW: 1) Use this tool to get count and basic list, 2) If count ≤50 AND user needs details → use list_clients for full data, 3) If count >50 AND user wants 'all' → use generate_clients_export_url instead. Supports same filtering as list_clients (status, category, type, advisors, etc.). Perfect for: 'how many clients?', 'list all clients' (check count first), 'show offshore clients' (check size first). This tool saves 70-80% tokens compared to list_clients.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "searchName": {
+          "type": "string",
+          "description": "Search by client name (partial match)"
+        },
+        "searchSimilarName": {
+          "type": "string",
+          "description": "Fuzzy search by name using trigram similarity"
+        },
+        "similarNameThreshold": {
+          "type": "number",
+          "description": "Similarity threshold (0.0-1.0). Default: 0.9"
+        },
+        "searchFinancialAdvisor": {
+          "type": "string",
+          "description": "Search by financial advisor name"
+        },
+        "searchClientAssociate": {
+          "type": "string",
+          "description": "Search by client associate name"
+        },
+        "filterStatusId": {
+          "type": "integer",
+          "description": "Filter by status ID"
+        },
+        "filterCategoryIds": {
+          "type": "string",
+          "description": "Comma-separated category IDs"
+        },
+        "filterTypeIds": {
+          "type": "string",
+          "description": "Comma-separated type IDs"
+        },
+        "filterFinancialAdvisorIds": {
+          "type": "string",
+          "description": "Comma-separated financial advisor user IDs"
+        },
+        "filterClientAssociateIds": {
+          "type": "string",
+          "description": "Comma-separated client associate user IDs"
+        },
+        "sortBy": {
+          "type": "string",
+          "description": "Sort by field: 'id', 'name'. Default: 'id'"
+        },
+        "sortOrder": {
+          "type": "string",
+          "description": "Sort order: 'asc' or 'desc'. Default: 'desc'"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum results. Use 10000 to get full count."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Skip results for pagination. Default: 0"
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by status name (user-friendly). Valid values: \"active\", \"prospect\", \"pending\", \"inactive\" (case-insensitive). Alternative to filterStatusId. Example: status=\"active\" returns only active clients.",
+          "enum": [
+            "active",
+            "prospect",
+            "pending",
+            "inactive"
+          ]
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "list_clients",
+    "description": "Search and list clients/companies in the CRM by name, financial advisor, client associate, status, category, or type. Supports both exact partial matching (ILIKE) and intelligent fuzzy matching (trigram similarity). CRITICAL for filtering by client attributes like category or type. IMPORTANT: When user asks for 'ALL' clients ('todos los clientes', 'all clients', 'every client'), you MUST use limit=200 to get the complete list - the default limit=10 will only show a subset! WORKFLOW FOR CATEGORY/TYPE FILTERING: If user mentions a category name (e.g., 'Off Shore', 'High Net Worth') or type name (e.g., 'Prospect', 'Customer'), you MUST first call list_client_categories or list_client_types to get the ID, then use that ID in filterCategoryIds/filterTypeIds. Example workflow: User asks 'todos los clientes off shore' → 1) Call list_client_categories to find 'Off Shore' category ID (e.g., ID=5), 2) Call list_clients with filterCategoryIds='5' AND limit=200. NEVER guess category/type IDs - always look them up first! Use for queries like 'find clients named TechCorp', 'show active clients', 'list companies similar to Acme Corp' (handles typos), 'get all Off Shore category clients' (lookup ID first, then use limit=200!), 'show clients of type Prospect' (lookup ID first, then use limit=200!). COMBINE with list_interactions to answer complex queries like 'Off Shore clients we didn't contact in January': 1) Get Off Shore category ID, 2) Use list_clients with filterCategoryIds AND limit=200, 3) Use list_interactions with dateFrom/dateTo for January, 4) Compare client lists to find clients with no interactions.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "searchName": {
+          "type": "string",
+          "description": "Search by client/company name - exact partial matching (case-insensitive ILIKE). Example: 'tech' matches 'TechCorp', 'Advanced Tech Solutions'. Use for precise substring searches. Can be combined with searchSimilarName."
+        },
+        "searchSimilarName": {
+          "type": "string",
+          "description": "FUZZY search by client/company name using trigram similarity - finds similar names even with typos, misspellings, or variations. PREFER THIS for user queries that might have spelling errors or when looking for 'similar' names. Example: 'Acme Corp' finds 'ACME Corporation', 'Acme Co.', 'Acme Crop' (typo). Results automatically ordered by similarity score (best matches first). Use when user says 'find similar', 'search for something like', or when you suspect name variations/typos."
+        },
+        "similarNameThreshold": {
+          "type": "number",
+          "description": "Similarity threshold for fuzzy search (0.0-1.0). Only used with searchSimilarName. Default: 0.9 (strict - very similar names only). Use 0.8 for moderate matching (allows more variation), 0.7 for loose matching (finds more distant matches). Higher values = stricter matching. Example: threshold 0.9 for 'Acme' finds 'Acme Corp', 'ACME Inc.'; threshold 0.7 also finds 'Acne Corp' (more typo tolerance)."
+        },
+        "searchFinancialAdvisor": {
+          "type": "string",
+          "description": "Search by financial advisor name - partial matching (case-insensitive). Use for queries about clients with specific advisors. Example: 'John' matches clients with FA 'John Smith', 'Johnny Doe'."
+        },
+        "searchClientAssociate": {
+          "type": "string",
+          "description": "Search by client associate name - partial matching (case-insensitive). Use for queries about clients with specific associates. Example: 'Maria' matches clients with CA 'Maria Garcia'."
+        },
+        "filterStatusId": {
+          "type": "integer",
+          "description": "Filter by EXACT status ID. Use list_client_statuses first to see available status IDs and names. Example: filterStatusId=1 might return only 'Active' clients. Common use: 'show me all active clients' or 'find prospect clients'."
+        },
+        "filterCategoryIds": {
+          "type": "string",
+          "description": "Filter by category IDs (comma-separated string). Example: '1,2,3' returns clients in category 1 OR 2 OR 3. CRITICAL: You MUST call list_client_categories FIRST to get the category ID from the category name - NEVER guess or assume IDs! Workflow: User says 'Off Shore clients' → 1) Call list_client_categories, 2) Find 'Off Shore' in results (e.g., ID=5), 3) Use filterCategoryIds='5'. Common use case: 'todos los clientes off shore' → call list_client_categories to find ID, then use that ID here. Multiple categories work as OR condition (e.g., '5,7,9')."
+        },
+        "filterTypeIds": {
+          "type": "string",
+          "description": "Filter by type IDs (comma-separated string). Example: '1,2' returns clients of type 1 OR 2. CRITICAL: You MUST call list_client_types FIRST to get the type ID from the type name - NEVER guess or assume IDs! Workflow: User says 'Prospect clients' → 1) Call list_client_types, 2) Find 'Prospect' in results (e.g., ID=3), 3) Use filterTypeIds='3'. Common use: 'show me all prospect clients' → call list_client_types to find ID, then use that ID here. Multiple types work as OR condition (e.g., '3,5')."
+        },
+        "filterFinancialAdvisorIds": {
+          "type": "string",
+          "description": "Filter by specific financial advisor user IDs (comma-separated string). Example: '10,20' returns clients assigned to FA with user ID 10 OR 20. Use list_users to get user IDs. More precise than searchFinancialAdvisor. Use for queries like 'show clients assigned to John (userId=10)'."
+        },
+        "filterClientAssociateIds": {
+          "type": "string",
+          "description": "Filter by specific client associate user IDs (comma-separated string). Example: '15,25' returns clients assigned to CA with user ID 15 OR 25. Use list_users to get user IDs. More precise than searchClientAssociate."
+        },
+        "sortBy": {
+          "type": "string",
+          "description": "Sort by field. Valid values: 'id', 'name', 'status'. Default is 'id'. NOTE: When searchSimilarName is used, results are automatically ordered by similarity score first, then by this field."
+        },
+        "sortOrder": {
+          "type": "string",
+          "description": "Sort direction: 'asc' or 'desc'. Default is 'desc'."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum results. Default is 10. CRITICAL: When user asks for 'all' clients ('todos', 'all', 'every', 'show me everything'), or when filtering by category/type/status, ALWAYS use limit=200 or higher to ensure you get the complete list. Examples: 'todos los clientes off shore' → use limit=200, 'all active clients' → use limit=200, 'show me all prospects' → use limit=200. Only use default limit=10 for exploratory queries without 'all/todos' keywords."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Skip this many results for pagination. Default is 0."
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by status name (user-friendly). Valid values: \"active\", \"prospect\", \"pending\", \"inactive\" (case-insensitive). Alternative to filterStatusId. Example: status=\"active\" returns only active clients. PREFER THIS over filterStatusId for better readability.",
+          "enum": [
+            "active",
+            "prospect",
+            "pending",
+            "inactive"
+          ]
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_client",
+    "description": "Retrieves detailed information about a specific client including contacts, teams, categories, and accounts.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "The unique identifier of the client"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "create_client",
+    "description": "Creates a new client in the CRM system. IMPORTANT: Before creating, call list_client_statuses to get valid status values. Use this when adding new business relationships.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the client/company"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of the client"
+        },
+        "status": {
+          "type": "string",
+          "description": "Client status value (use list_client_statuses to see valid values). Common values: 'prospect' (new potential client), 'active' (current client), 'inactive' (dormant client). Default to 'prospect' for new mentions."
+        },
+        "typeIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Array of client type IDs. REQUIRED field. Use list_client_types to get valid IDs. At least one type ID is required."
+        },
+        "typeId": {
+          "type": "integer",
+          "description": "DEPRECATED: Use typeIds array instead. Single client type ID for backward compatibility."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "update_client",
+    "description": "Updates an existing client's information including assignment of Financial Advisors (FAs) and Client Associates (CAs). All fields are optional except 'id'. Supports partial updates - only provide fields you want to change.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the client to update. REQUIRED."
+        },
+        "name": {
+          "type": "string",
+          "description": "New name for the client"
+        },
+        "description": {
+          "type": "string",
+          "description": "New description"
+        },
+        "assignedTeamIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Array of team IDs to assign to this client. Replaces existing team assignments."
+        },
+        "financialAdvisorIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Array of user IDs to assign as Financial Advisors (FAs) to this client. These are users with financial advisor roles who will manage the client's portfolio. Use list_users to get available FA user IDs. Replaces existing FA assignments."
+        },
+        "clientAssociateIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Array of user IDs to assign as Client Associates (CAs) to this client. These are support staff who assist with client management. Use list_users to get available CA user IDs. Replaces existing CA assignments."
+        },
+        "clientTypeIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Array of client type IDs. Use list_client_types to get valid IDs. Replaces existing type assignments."
+        },
+        "clientCategoryIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Array of client category IDs. Use list_client_categories to get valid IDs. Replaces existing category assignments."
+        },
+        "clientStatusId": {
+          "type": "integer",
+          "description": "New client status ID. Use list_client_statuses to get valid IDs. Common statuses: 1=Active, 2=Prospect, 3=Pending, 4=Inactive."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the client is active (true) or inactive (false)"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "list_contacts",
+    "description": "Search and list contacts across all clients in the CRM with comprehensive filtering. Supports both exact partial matching (ILIKE) on name/email/phone and intelligent fuzzy matching (trigram similarity) on names. Use for queries like 'find contacts named John', 'show contacts with gmail email', 'list contacts similar to Maria Garcia' (handles typos), 'find contacts in role X', 'show contacts that receive information'.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "searchName": {
+          "type": "string",
+          "description": "Search by contact name - exact partial matching (case-insensitive ILIKE). Example: 'john' matches 'John Smith', 'Johnny Doe', 'Mary Johnson'. Use for precise substring searches. Can be combined with searchSimilarName."
+        },
+        "searchSimilarName": {
+          "type": "string",
+          "description": "FUZZY search by contact name using trigram similarity - finds similar names even with typos, misspellings, or variations. PREFER THIS for user queries that might have spelling errors or when looking for 'similar' names. Example: 'Jon Smith' finds 'John Smith', 'John Smyth', 'Jon Smithson'. Results automatically ordered by similarity score (best matches first). Use when user says 'find similar', 'search for something like', or when you suspect name variations/typos."
+        },
+        "similarNameThreshold": {
+          "type": "number",
+          "description": "Similarity threshold for fuzzy search (0.0-1.0). Only used with searchSimilarName. Default: 0.9 (strict - very similar names only). Use 0.8 for moderate matching (allows more variation), 0.7 for loose matching (finds more distant matches). Higher values = stricter matching. Example: threshold 0.9 for 'John' finds 'John Smith', 'Johnny'; threshold 0.7 also finds 'Jon', 'Johan' (more variation tolerance)."
+        },
+        "searchEmail": {
+          "type": "string",
+          "description": "Search by email - partial matching (case-insensitive ILIKE). Example: 'gmail' matches all Gmail users, 'john.smith' matches 'john.smith@company.com'. Use for email-based queries."
+        },
+        "searchPhone": {
+          "type": "string",
+          "description": "Search by phone number - partial matching. Example: '555' matches any phone containing '555'. Use for phone number queries."
+        },
+        "filterRoleIds": {
+          "type": "string",
+          "description": "Filter by contact role IDs (comma-separated). Example: '1,2,3' returns contacts with any of these role IDs. Use to find contacts with specific roles like 'CEO', 'Technical Lead', etc. Combine with other filters for precise results."
+        },
+        "filterClientIds": {
+          "type": "string",
+          "description": "Filter by client IDs (comma-separated). Example: '5,10,15' returns only contacts from these specific clients. Use when you want contacts from particular companies/clients only."
+        },
+        "filterReceivesInformation": {
+          "type": "boolean",
+          "description": "Filter by whether contact receives information/communications. Set to true to find contacts who should receive updates, false for those who shouldn't. Use for queries like 'show contacts that receive newsletters', 'find contacts opted out of communications'."
+        },
+        "sortBy": {
+          "type": "string",
+          "description": "Sort by field. Valid values: 'id', 'name', 'email', 'client_id'. Default is 'id'. NOTE: When searchSimilarName is used, results are automatically ordered by similarity score first, then by this field."
+        },
+        "sortOrder": {
+          "type": "string",
+          "description": "Sort direction: 'asc' (ascending) or 'desc' (descending). Default is 'desc'."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum results to return. Default is 10. Use 50-100 for larger lists or when user asks for 'all' contacts."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Skip this many results for pagination. Default is 0."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_client_contacts",
+    "description": "Retrieves all contacts associated with a specific client.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "integer",
+          "description": "ID of the client whose contacts to retrieve"
+        }
+      },
+      "required": [
+        "clientId"
+      ]
+    }
+  },
+  {
+    "name": "create_contact",
+    "description": "Creates a new contact and associates it with a client.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "integer",
+          "description": "ID of the client this contact belongs to"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the contact"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number"
+        },
+        "roleId": {
+          "type": "integer",
+          "description": "Contact role ID (e.g., 'Primary Contact', 'Technical Lead')"
+        }
+      },
+      "required": [
+        "clientId",
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "list_interactions",
+    "description": "TOOL to list and filter interactions (NOT a URL endpoint). Call this function with parameters to retrieve interaction data. NEVER construct URLs like 'https://...com/interactions?clients=70' - that will NOT work. Instead, call this tool with filterClientIds parameter. COMPREHENSIVE filtering capabilities: summary text (fuzzy search), semantic topic search (AI-powered), clients, contacts, users, date ranges, follow-up dates, and interaction type. CRITICAL for complex queries combining client attributes with interaction history. TOKEN OPTIMIZATION: ALWAYS use excludeFields='details,followUpNotes' for list operations to reduce token usage by 70-80% - only fetch full details with get_interaction when needed. EXAMPLES of correct usage: 'show interactions for client ID 70' → list_interactions(filterClientIds=[70], excludeFields='details,followUpNotes'); 'find calls with Client X' → first get_client(name='X') to get ID, then list_interactions(filterClientIds=[X_id]); 'interactions about budget' → list_interactions(searchSemantic='budget'). COMBINE with list_clients to answer queries like 'clients we didn't contact during January' by: 1) Get all clients with list_clients, 2) Get all interactions in January with list_interactions (with excludeFields), 3) Find clients NOT in the interaction list.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "searchSummary": {
+          "type": "string",
+          "description": "Fuzzy search by interaction summary. Finds interactions with similar text using trigram similarity. Example: 'budget discussion' will match 'Budget discussion for Q4', 'Discussed budget allocation', etc."
+        },
+        "searchSemantic": {
+          "type": "string",
+          "description": "Semantic search on interaction details and follow-up notes using AI embeddings. Finds conceptually similar interactions by topic/meaning, not just keywords. Works in Spanish and English. Examples: 'pricing concerns' finds 'cost issues', 'budget worries', 'expensive quotes'; 'problemas técnicos' finds 'fallas del sistema', 'errores de software'. Use this for topic-based queries where exact keyword matching isn't needed."
+        },
+        "semanticThreshold": {
+          "type": "number",
+          "description": "Similarity threshold for semantic search (0.0-1.0). Higher values = stricter matching. Default: 0.7. Use 0.8+ for very specific topics, 0.6-0.7 for broader topics. Only applies when searchSemantic is used."
+        },
+        "semanticLimit": {
+          "type": "integer",
+          "description": "Maximum number of results for semantic search. Default: 50. Use lower values (10-20) for focused results, higher (50-100) for comprehensive searches. Only applies when searchSemantic is used."
+        },
+        "filterClientIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "CRITICAL: Filter by one or more client IDs. Only interactions associated with these clients will be returned. THIS IS THE ONLY WAY TO GET INTERACTIONS FOR SPECIFIC CLIENTS. Examples: [70] for one client, [1,5,10] for multiple clients. MANDATORY WORKFLOW when user asks about client interactions: 1) FIRST call list_clients or get_client to find the client(s) and get their ID(s), 2) THEN call list_interactions with filterClientIds. NEVER construct URLs or skip step 1. COMMON PATTERNS: 'show interactions for client Foo' → list_clients(searchName='Foo') to get ID, then list_interactions(filterClientIds=[ID]); 'interactions with Off Shore clients in January' → list_clients(filterCategoryNames=['Off Shore']) to get IDs, then list_interactions(filterClientIds=[ID1,ID2,...], dateFrom='2026-01-01', dateTo='2026-01-31'); 'clients we didn't contact in January' → get all client IDs with list_clients, get January interactions with list_interactions(dateFrom='2026-01-01', dateTo='2026-01-31'), find clients NOT in interaction list."
+        },
+        "filterContactIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Filter by one or more contact IDs. Only interactions where these contacts participated will be returned. Use to find all interactions involving specific contacts across all clients."
+        },
+        "filterUserIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Filter by one or more user/team member IDs. Only interactions where these users participated will be returned. Use to find all interactions a specific team member was involved in."
+        },
+        "filterInteractionType": {
+          "type": "integer",
+          "description": "Filter by EXACT interaction type ID (use list_interaction_types to see available types like 'Phone Call', 'Email', 'Meeting'). IMPORTANT: This filters to ONE specific type. Example: filterInteractionType=1 might return only 'Phone Call' interactions. Leave empty to see all types. Common use case: 'show me all phone calls with client X' or 'find all email interactions in January'."
+        },
+        "dateFrom": {
+          "type": "string",
+          "description": "CRITICAL: Filter interactions that HAPPENED ON or AFTER this date (interaction date, not follow-up date). This is the date when the interaction ALREADY OCCURRED. Format: ISO 8601 (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss). IMPORTANT: When user asks for interactions 'in January', 'during last week', 'on Saturday the 17th', 'el sábado 17', use BOTH dateFrom and dateTo to create a range. Examples: 'interactions in January 2024' → dateFrom='2024-01-01' AND dateTo='2024-01-31'; 'interactions on January 18th' → dateFrom='2026-01-18' AND dateTo='2026-01-18'; 'last week' → calculate the week range; 'el sábado 17 de enero' → dateFrom='2026-01-17' AND dateTo='2026-01-17'. NEVER use just dateFrom without dateTo for specific dates or bounded periods."
+        },
+        "dateTo": {
+          "type": "string",
+          "description": "CRITICAL: Filter interactions that HAPPENED ON or BEFORE this date (interaction date, not follow-up date). This is the date when the interaction ALREADY OCCURRED. Format: ISO 8601 (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss). IMPORTANT: When user specifies a time period or specific date, ALWAYS use this WITH dateFrom to create a complete range. Examples: 'interactions in Q1 2024' → dateFrom='2024-01-01' AND dateTo='2024-03-31'; 'interactions today' → dateFrom='2026-01-18' AND dateTo='2026-01-18'; 'this month' → calculate month start and end dates. Using both dateFrom and dateTo ensures you capture ALL interactions in the specified period."
+        },
+        "followUpDateFrom": {
+          "type": "string",
+          "description": "CRITICAL: Filter by FUTURE follow-up date ON or AFTER this date. This is NOT when the interaction happened, but when a FUTURE action is scheduled. Use to find interactions with upcoming or overdue follow-ups. Format: ISO 8601 (YYYY-MM-DD). Examples: 'follow-ups next week' → calculate next week's start date; 'overdue follow-ups' → use today's date minus some days; 'follow-ups in February' → followUpDateFrom='2026-02-01' AND followUpDateTo='2026-02-28'. DO NOT confuse with dateFrom (which filters when interactions happened)."
+        },
+        "followUpDateTo": {
+          "type": "string",
+          "description": "CRITICAL: Filter by FUTURE follow-up date ON or BEFORE this date. This is NOT when the interaction happened, but when a FUTURE action is scheduled. Format: ISO 8601 (YYYY-MM-DD). Combine with followUpDateFrom for follow-up date ranges. Examples: 'follow-ups this month' → followUpDateFrom='2026-01-01' AND followUpDateTo='2026-01-31'; 'follow-ups before end of quarter' → followUpDateTo='2026-03-31'. DO NOT confuse with dateTo (which filters when interactions happened)."
+        },
+        "hasFollowUp": {
+          "type": "boolean",
+          "description": "Filter by whether interaction has a follow-up date set. Use true to find interactions needing follow-up, false for completed interactions with no follow-up needed."
+        },
+        "excludeFields": {
+          "type": "string",
+          "description": "TOKEN OPTIMIZATION: Comma-separated list of fields to exclude from response to reduce token usage by 70-80%. RECOMMENDED for list operations: 'details,followUpNotes' (excludes heavy text fields). Available fields to exclude: 'details' (main interaction notes), 'followUpNotes' (follow-up text), 'summary' (brief summary), 'interactionType' (nested type object), 'clients' (nested client objects), 'contacts' (nested contact objects), 'users' (nested user objects). Example: 'details,followUpNotes,users' for maximum reduction. Use get_interaction to fetch full details for specific interactions."
+        },
+        "sortBy": {
+          "type": "string",
+          "description": "Sort results by field. Options: 'date' (interaction date), 'id'. Default: 'date'."
+        },
+        "sortOrder": {
+          "type": "string",
+          "description": "Sort order. Options: 'asc' (ascending/oldest first), 'desc' (descending/newest first). Default: 'desc'."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum results to return. Default is 10. CRITICAL: When user asks for 'all' interactions ('todas las interacciones', 'all interactions', 'every interaction'), or when filtering by date range/client/type, ALWAYS use limit=200 to get the complete list. Examples: 'todas las interacciones de enero' → use limit=200, 'all calls with client X' → use limit=200, 'show all interactions for Off Shore clients' → use limit=200. If you need to analyze patterns (e.g., 'clients we didn't contact'), set limit=200 to ensure complete data."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number to skip for pagination (default: 0). Use for paginating through large result sets."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_interaction",
+    "description": "Retrieves detailed information about a specific interaction including notes, participants, and type.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the interaction to retrieve"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "create_interaction",
+    "description": "Creates a new interaction record (call, meeting, email, etc.) with one or more clients. IMPORTANT: Before creating an interaction, you should:\n1. Ask the user which client(s) they interacted with (use list_clients to search if needed)\n2. Ask what type of interaction it was (use list_interaction_types to see available types)\n3. Ask for the interaction date (defaults to today if not specified)\n4. Ask for any details or notes about the interaction\n5. Optionally ask about follow-up actions\n\nThis conversational approach ensures you gather all necessary information naturally.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "description": "CRITICAL: This is the date when the interaction ALREADY HAPPENED (past tense). Look for PAST TENSE indicators in the user's message. Spanish examples: 'tuve una llamada el sábado' (had a call on Saturday), 'hablé con él ayer' (spoke yesterday), 'me reuní el lunes' (met on Monday). English examples: 'I called him on Monday', 'we met last week', 'had a meeting yesterday'. Format: ISO 8601 (YYYY-MM-DDTHH:mm:ss or YYYY-MM-DD). If user says 'today', use current date. If user says 'yesterday', calculate yesterday's date. DO NOT confuse this with followUpDate - this field is ONLY for when the interaction occurred in the past, NOT for future scheduled meetings."
+        },
+        "interactionTypeId": {
+          "type": "integer",
+          "description": "ID of the interaction type. Use list_interaction_types to see available types. Common types include: Phone Call, Email, Meeting, In-Person Visit, etc."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Optional brief summary of the interaction (max 255 characters). Use this for a concise one-line description. Example: 'Discussed Q4 strategy and budget allocation'. If not provided, will be null."
+        },
+        "details": {
+          "type": "string",
+          "description": "Detailed notes about what was discussed or what happened during the interaction. This is the main content of the interaction record and can be as long as needed."
+        },
+        "followUpNotes": {
+          "type": "string",
+          "description": "Optional notes about any follow-up actions needed. Example: 'Send proposal by Friday', 'Schedule follow-up call next week'."
+        },
+        "followUpDate": {
+          "type": "string",
+          "description": "CRITICAL: This is ONLY for FUTURE scheduled follow-up actions (future tense). Look for FUTURE TENSE indicators in the user's message. Spanish examples: 'quedamos en juntarnos el miércoles' (we agreed to meet on Wednesday), 'vamos a llamar la próxima semana' (we will call next week), 'tenemos que reunirnos el viernes' (we have to meet on Friday). English examples: 'scheduled meeting for Friday', 'will follow up next month', 'agreed to call next week', 'let's meet on Tuesday'. Format: ISO 8601 (YYYY-MM-DD). Only include if user explicitly mentions a FUTURE action or scheduled date. DO NOT use this for the date when the interaction already happened - use the 'date' field for past interactions."
+        },
+        "clientIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Array of client IDs involved in this interaction. Usually this will be a single client, but can include multiple clients if it was a group interaction. Example: [5] for one client, [5, 12] for multiple clients."
+        },
+        "contactIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Optional array of contact IDs who participated in the interaction. Only include if user mentions specific contacts by name."
+        },
+        "userIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Optional array of user/team member IDs who were involved in the interaction. Only include if user mentions specific team members participated."
+        }
+      },
+      "required": [
+        "date",
+        "interactionTypeId"
+      ]
+    }
+  },
+  {
+    "name": "update_interaction",
+    "description": "Updates an existing interaction. All fields are optional except ID - only provide fields you want to change. Use this to:\n- Add or modify interaction details/notes\n- Change the interaction type\n- Update the date\n- Add follow-up information\n- Mark interaction as inactive\n- Add/modify associated clients, contacts, or users",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the interaction to update (required)"
+        },
+        "date": {
+          "type": "string",
+          "description": "New date/time for the interaction in ISO 8601 format (YYYY-MM-DDTHH:mm:ss or YYYY-MM-DD)"
+        },
+        "interactionTypeId": {
+          "type": "integer",
+          "description": "New interaction type ID"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Updated brief summary of the interaction (max 255 characters). Use this for a concise one-line description."
+        },
+        "details": {
+          "type": "string",
+          "description": "Updated detailed notes about the interaction"
+        },
+        "followUpNotes": {
+          "type": "string",
+          "description": "Updated follow-up notes"
+        },
+        "followUpDate": {
+          "type": "string",
+          "description": "Updated follow-up date in ISO 8601 format (YYYY-MM-DD)"
+        },
+        "clientIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Updated array of client IDs. This replaces existing clients."
+        },
+        "contactIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Updated array of contact IDs. This replaces existing contacts."
+        },
+        "userIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Updated array of user IDs. This replaces existing users."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Set to false to mark the interaction as inactive/deleted"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "create_interaction_type",
+    "description": "Creates a new interaction type category (e.g., 'Phone Call', 'Email', 'Meeting'). Use this to customize interaction categorization.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the interaction type"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of when to use this type"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "get_interaction_type",
+    "description": "Retrieves details about a specific interaction type.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the interaction type"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "list_interaction_types",
+    "description": "Retrieves all interaction type categories available in the system.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number to return"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number to skip for pagination"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "update_interaction_type",
+    "description": "Updates an interaction type's name, description, or active status.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the interaction type to update"
+        },
+        "name": {
+          "type": "string",
+          "description": "New name"
+        },
+        "description": {
+          "type": "string",
+          "description": "New description"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the type is active"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "delete_interaction_type",
+    "description": "Soft deletes an interaction type, removing it from active use while preserving historical data.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the interaction type to delete"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "list_teams",
+    "description": "Retrieves all teams in the organization. Useful for managing team assignments and permissions.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number to return"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number to skip"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_team",
+    "description": "Retrieves detailed information about a specific team including members and assigned clients.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the team"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "create_team",
+    "description": "Creates a new team for organizing users and managing client access.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the team"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of the team's purpose"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "list_notifications",
+    "description": "Retrieves notifications for the current user. Use this to show recent alerts and updates.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "unreadOnly": {
+          "type": "boolean",
+          "description": "If true, only show unread notifications"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number to return"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number to skip"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "mark_notifications_read",
+    "description": "Marks one or more notifications as read for the current user.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "notificationIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Array of notification IDs to mark as read"
+        },
+        "markAllRead": {
+          "type": "boolean",
+          "description": "If true, marks ALL notifications as read (ignores notificationIds)"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "list_accounts",
+    "description": "List all client accounts (trading accounts, investment accounts, etc.) in the system.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Max results"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Skip results"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "create_account",
+    "description": "Create a new account for a client. Must call list_account_platforms and list_account_types FIRST to get valid IDs.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "integer",
+          "description": "Client ID (required)"
+        },
+        "platformId": {
+          "type": "integer",
+          "description": "Platform ID (Binance, Trading212, etc. - call list_account_platforms first)"
+        },
+        "accountTypeId": {
+          "type": "integer",
+          "description": "Account type ID (call list_account_types first)"
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Account number/identifier"
+        },
+        "description": {
+          "type": "string",
+          "description": "Account description"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Active status (default: true)"
+        }
+      },
+      "required": [
+        "clientId",
+        "platformId",
+        "accountTypeId"
+      ]
+    }
+  },
+  {
+    "name": "get_account",
+    "description": "Get detailed information about a specific account.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Account ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "update_account",
+    "description": "Update an existing account.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Account ID"
+        },
+        "platformId": {
+          "type": "integer",
+          "description": "Platform ID"
+        },
+        "accountTypeId": {
+          "type": "integer",
+          "description": "Account type ID"
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Account number"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Active status"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "delete_account",
+    "description": "Delete an account.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Account ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "get_client_accounts",
+    "description": "Get all accounts for a specific client.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "integer",
+          "description": "Client ID"
+        }
+      },
+      "required": [
+        "clientId"
+      ]
+    }
+  },
+  {
+    "name": "list_account_platforms",
+    "description": "List all account platforms (Binance, Trading212, Interactive Brokers, etc.). MUST call this before creating accounts to get platform IDs.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Max results"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Skip results"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "create_account_platform",
+    "description": "Create a new account platform type.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Platform name (e.g., 'Binance', 'Trading212')"
+        },
+        "description": {
+          "type": "string",
+          "description": "Platform description"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Active status"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "get_account_platform",
+    "description": "Get details of a specific platform.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Platform ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "update_account_platform",
+    "description": "Update an account platform.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Platform ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Platform name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Active status"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "delete_account_platform",
+    "description": "Delete an account platform.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Platform ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "list_account_types",
+    "description": "List all account types (Individual, Corporate, Joint, etc.). MUST call this before creating accounts to get type IDs.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Max results"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Skip results"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "create_account_type",
+    "description": "Create a new account type.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Type name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Type description"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Active status"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "get_account_type",
+    "description": "Get details of a specific account type.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Type ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "update_account_type",
+    "description": "Update an account type.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Type ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Type name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Active status"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "delete_account_type",
+    "description": "Delete an account type.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Type ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "list_contact_roles",
+    "description": "List all contact role types (Decision Maker, Accountant, Assistant, etc.). MUST call this before creating contacts to get role IDs.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Max results"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Skip results"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "create_contact_role",
+    "description": "Create a new contact role type.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Role name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Role description"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Active status"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "get_contact_role",
+    "description": "Get details of a specific contact role.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Role ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "update_contact_role",
+    "description": "Update a contact role.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Role ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Role name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Active status"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "delete_contact_role",
+    "description": "Delete a contact role.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Role ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "create_interaction_frequency",
+    "description": "Set expected interaction frequency for a client (e.g., contact monthly, quarterly). Must call list_interaction_types first.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "integer",
+          "description": "Client ID"
+        },
+        "interactionTypeId": {
+          "type": "integer",
+          "description": "Interaction type ID"
+        },
+        "frequencyDays": {
+          "type": "integer",
+          "description": "Expected days between interactions"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Active status"
+        }
+      },
+      "required": [
+        "clientId",
+        "interactionTypeId",
+        "frequencyDays"
+      ]
+    }
+  },
+  {
+    "name": "get_interaction_frequencies",
+    "description": "Get all interaction frequency rules for a client.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "integer",
+          "description": "Client ID"
+        }
+      },
+      "required": [
+        "clientId"
+      ]
+    }
+  },
+  {
+    "name": "update_interaction_frequency",
+    "description": "Update an interaction frequency rule.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "integer",
+          "description": "Client ID"
+        },
+        "id": {
+          "type": "integer",
+          "description": "Frequency rule ID"
+        },
+        "interactionTypeId": {
+          "type": "integer",
+          "description": "Interaction type ID"
+        },
+        "frequencyDays": {
+          "type": "integer",
+          "description": "Days between interactions"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Active status"
+        }
+      },
+      "required": [
+        "clientId",
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "delete_interaction_frequency",
+    "description": "Delete an interaction frequency rule.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "integer",
+          "description": "Client ID"
+        },
+        "id": {
+          "type": "integer",
+          "description": "Frequency rule ID"
+        }
+      },
+      "required": [
+        "clientId",
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "generate_accounts_export_url",
+    "description": "Generates a CSV or XLSX export URL for accounts based on filters. Returns a clickable download URL instead of actual data to save tokens. The user can click the URL to download the file directly. Use when user asks to export, download, or get accounts data.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "xlsx"
+          ],
+          "description": "Export file format. Options: 'csv' (default) or 'xlsx' (Excel). IMPORTANT: When user specifies a format explicitly (e.g., 'export to Excel', 'download as XLSX'), you MUST use that format. Default to 'csv' only when format is not specified."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional list of fields to include in export. Available fields: 'id', 'name', 'number', 'platform', 'client', 'types', 'status', 'description', 'created_at', 'updated_at'. If not provided, all fields are included."
+        },
+        "searchName": {
+          "type": "string",
+          "description": "Filter by account name (partial match)"
+        },
+        "searchNumber": {
+          "type": "string",
+          "description": "Filter by account number (partial match)"
+        },
+        "filterPlatformIds": {
+          "type": "string",
+          "description": "Comma-separated platform IDs to filter by"
+        },
+        "filterClientIds": {
+          "type": "string",
+          "description": "Comma-separated client IDs to filter by"
+        },
+        "filterTypeIds": {
+          "type": "string",
+          "description": "Comma-separated account type IDs to filter by"
+        },
+        "filterStatusId": {
+          "type": "integer",
+          "description": "Filter by account status ID"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "generate_clients_export_url",
+    "description": "Generates a CSV or XLSX export URL for clients based on filters. Returns a clickable download URL instead of actual data to save tokens. Use when user asks to export, download, or get clients data.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "xlsx"
+          ],
+          "description": "Export file format. Options: 'csv' (default) or 'xlsx' (Excel). IMPORTANT: When user specifies a format explicitly (e.g., 'export to Excel', 'download as XLSX'), you MUST use that format. Default to 'csv' only when format is not specified."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional list of fields to include in export. Available fields: 'id', 'name', 'description', 'status', 'category', 'type', 'financial_advisors', 'client_associates', 'created_at', 'updated_at'. If not provided, all fields are included."
+        },
+        "searchName": {
+          "type": "string",
+          "description": "Search by client name (partial match)"
+        },
+        "filterStatusId": {
+          "type": "integer",
+          "description": "Filter by client status ID"
+        },
+        "filterCategoryIds": {
+          "type": "string",
+          "description": "Comma-separated category IDs to filter by"
+        },
+        "filterTypeIds": {
+          "type": "string",
+          "description": "Comma-separated client type IDs to filter by"
+        },
+        "filterFinancialAdvisorIds": {
+          "type": "string",
+          "description": "Comma-separated financial advisor user IDs to filter by"
+        },
+        "filterClientAssociateIds": {
+          "type": "string",
+          "description": "Comma-separated client associate user IDs to filter by"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "generate_interactions_export_url",
+    "description": "Generates a CSV or XLSX export URL for interactions based on filters. Returns a clickable download URL instead of actual data to save tokens. Use when user asks to export, download, or get interactions data.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "xlsx"
+          ],
+          "description": "Export file format. Options: 'csv' (default) or 'xlsx' (Excel). IMPORTANT: When user specifies a format explicitly (e.g., 'export to Excel', 'download as XLSX'), you MUST use that format. Default to 'csv' only when format is not specified."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional list of fields to include in export. Available fields: 'id', 'date', 'type', 'summary', 'details', 'follow_up_notes', 'follow_up_date', 'clients', 'contacts', 'users', 'created_at', 'updated_at'. If not provided, all fields are included."
+        },
+        "searchSummary": {
+          "type": "string",
+          "description": "Search by summary text (partial match)"
+        },
+        "filterClientIds": {
+          "type": "string",
+          "description": "Comma-separated client IDs to filter by"
+        },
+        "filterContactIds": {
+          "type": "string",
+          "description": "Comma-separated contact IDs to filter by"
+        },
+        "filterUserIds": {
+          "type": "string",
+          "description": "Comma-separated user IDs to filter by"
+        },
+        "filterInteractionType": {
+          "type": "integer",
+          "description": "Filter by interaction type ID"
+        },
+        "dateFrom": {
+          "type": "string",
+          "description": "Filter interactions from this date (YYYY-MM-DD format)"
+        },
+        "dateTo": {
+          "type": "string",
+          "description": "Filter interactions until this date (YYYY-MM-DD format)"
+        },
+        "followUpDateFrom": {
+          "type": "string",
+          "description": "Filter by follow-up date from (YYYY-MM-DD format)"
+        },
+        "followUpDateTo": {
+          "type": "string",
+          "description": "Filter by follow-up date until (YYYY-MM-DD format)"
+        },
+        "hasFollowUp": {
+          "type": "boolean",
+          "description": "Filter by whether interaction has a follow-up date"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "generate_contacts_export_url",
+    "description": "Generates a CSV or XLSX export URL for contacts based on filters. Returns a clickable download URL instead of actual data to save tokens. Use when user asks to export, download, or get contacts data.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "xlsx"
+          ],
+          "description": "Export file format. Options: 'csv' (default) or 'xlsx' (Excel). IMPORTANT: When user specifies a format explicitly (e.g., 'export to Excel', 'download as XLSX'), you MUST use that format. Default to 'csv' only when format is not specified."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional list of fields to include in export. Available fields: 'id', 'name', 'role', 'email', 'phone', 'description', 'client', 'receives_information', 'is_active', 'created_at', 'updated_at'. If not provided, all fields are included."
+        },
+        "searchName": {
+          "type": "string",
+          "description": "Search by contact name (partial match)"
+        },
+        "searchEmail": {
+          "type": "string",
+          "description": "Search by email (partial match)"
+        },
+        "filterClientIds": {
+          "type": "string",
+          "description": "Comma-separated client IDs to filter by"
+        },
+        "filterRoleIds": {
+          "type": "string",
+          "description": "Comma-separated role IDs to filter by"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "invite_user",
+    "description": "Invites a new user to the CRM system via email. Creates a temporary account with auto-generated password that the invited user must change upon first login via activate_user tool. WORKFLOW: 1) Call list_roles to get valid roleId for the user, 2) Call this tool with email and roleId, 3) System sends invitation email with temporary credentials, 4) Invited user completes activation using activate_user tool with their chosen password. Use this for onboarding new team members. Returns temporary password that should be shared securely with the invited user.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "invitedUserEmail": {
+          "type": "string",
+          "description": "Email address of the user to invite. Must be unique in the system and valid email format. This will be their login username."
+        },
+        "invitedUserRoleId": {
+          "type": "integer",
+          "description": "Role ID to assign to the invited user. Determines their permissions. CRITICAL: Call list_roles first to see available roles and their IDs. Common roles: Admin, Manager, Sales Representative."
+        }
+      },
+      "required": [
+        "invitedUserEmail",
+        "invitedUserRoleId"
+      ]
+    }
+  },
+  {
+    "name": "activate_user",
+    "description": "Completes user activation/onboarding after receiving an invitation. This is a PUBLIC endpoint that does NOT require authentication (invited users don't have login credentials yet). WORKFLOW: 1) User receives invitation email with temporary credentials, 2) User calls this tool with their email and chosen password plus profile information, 3) Account is activated and user can login. Use this to complete the onboarding process for invited users. After activation, user should call the login tool with their new credentials.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address from the invitation. Must match the invited email exactly."
+        },
+        "username": {
+          "type": "string",
+          "description": "Desired username for login (3-50 characters). Can be different from email."
+        },
+        "password": {
+          "type": "string",
+          "description": "New password for the account (minimum 6 characters). This replaces the temporary password from invitation."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "User's first name. Will be title-cased automatically."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "User's last name. Will be title-cased automatically."
+        },
+        "phone": {
+          "type": "string",
+          "description": "User's phone number. Will be sanitized automatically. Example: '+1234567890'"
+        },
+        "avatarImage": {
+          "type": "string",
+          "description": "Optional base64-encoded avatar image or image URL."
+        }
+      },
+      "required": [
+        "email",
+        "username",
+        "password",
+        "firstName",
+        "lastName",
+        "phone"
+      ]
+    }
+  },
+  {
+    "name": "list_users_summary",
+    "description": "TOKEN OPTIMIZATION: Returns a lightweight summary list of users with only essential fields (id, firstName, lastName, username, email). Use this FIRST when user requests basic user listings or needs to find a user ID. This endpoint is 70-80% more token-efficient than list_users. WORKFLOW: 1) Use this tool for initial user searches or when you just need user IDs, 2) If more details needed, call get_user with specific ID. EXAMPLES: 'show me all users', 'who are the team members', 'list sales reps'. Supports same search filters as list_users but returns minimal data.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "searchFirstName": {
+          "type": "string",
+          "description": "Search by first name - partial matching (case-insensitive)."
+        },
+        "searchLastName": {
+          "type": "string",
+          "description": "Search by last name - partial matching (case-insensitive)."
+        },
+        "searchEmail": {
+          "type": "string",
+          "description": "Search by email - partial matching (case-insensitive)."
+        },
+        "searchPhone": {
+          "type": "string",
+          "description": "Search by phone number - partial matching."
+        },
+        "sortBy": {
+          "type": "string",
+          "description": "Sort results by field. Valid values: 'id', 'firstName', 'lastName', 'email'. Default is 'id'."
+        },
+        "sortOrder": {
+          "type": "string",
+          "description": "Sort direction. Valid values: 'asc' (ascending) or 'desc' (descending). Default is 'desc'."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of results to return. Default: 10. Use higher values (e.g., 100) to get all users."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number of results to skip for pagination. Default: 0."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "delete_user",
+    "description": "Soft deletes a user from the CRM system. The user record is marked as inactive rather than permanently deleted to preserve referential integrity with interactions, clients, etc. Deleted users cannot log in and will not appear in active user lists. Use with caution as this affects access control.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the user to delete. CRITICAL: Ensure you have the correct user ID before deletion."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "get_client_visibility_rules",
+    "description": "Retrieves client visibility rules for a specific user. Visibility rules determine which clients a user can see based on their role assignments (financial advisor or client associate). Returns an array of rules showing which other users' client associations this user can view. Use this to understand client access permissions.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "viewerUserId": {
+          "type": "integer",
+          "description": "ID of the user whose visibility rules you want to retrieve."
+        }
+      },
+      "required": [
+        "viewerUserId"
+      ]
+    }
+  },
+  {
+    "name": "set_client_visibility_rules",
+    "description": "Configures client visibility rules for a user. Visibility rules control which clients a user can see based on relationship types. WORKFLOW: 1) Get list of users who should be visible, 2) For each user, specify visibility type ('financial_advisor' or 'client_associate'), 3) Call this tool with rules array. This completely replaces existing rules for the viewer user. EXAMPLE: Financial advisor needs to see clients assigned to their team members - create rules with visibilityType='financial_advisor' for each team member.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "viewerUserId": {
+          "type": "integer",
+          "description": "ID of the user whose visibility rules are being configured."
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "targetUserId": {
+                "type": "integer",
+                "description": "ID of the user whose clients should be visible."
+              },
+              "visibilityType": {
+                "type": "string",
+                "enum": [
+                  "financial_advisor",
+                  "client_associate"
+                ],
+                "description": "Type of visibility relationship. 'financial_advisor' shows clients where target user is financial advisor. 'client_associate' shows clients where target user is client associate."
+              }
+            },
+            "required": [
+              "targetUserId",
+              "visibilityType"
+            ]
+          },
+          "description": "Array of visibility rules. Each rule grants visibility to clients associated with a target user. Replaces all existing rules."
+        }
+      },
+      "required": [
+        "viewerUserId",
+        "rules"
+      ]
+    }
+  },
+  {
+    "name": "list_roles_summary",
+    "description": "TOKEN OPTIMIZATION: Returns a lightweight summary list of roles with only essential fields (id, name, description). Use this FIRST when listing roles or finding role IDs. More token-efficient than list_roles. Use for role selection workflows.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of results. Default: 10."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Pagination offset. Default: 0."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "update_role",
+    "description": "Updates an existing role's information. All fields except 'id' are optional - only provide fields you want to change. Use this to modify role names, descriptions, access levels, or active status.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the role to update. REQUIRED."
+        },
+        "name": {
+          "type": "string",
+          "description": "New role name (3-50 characters). Optional."
+        },
+        "description": {
+          "type": "string",
+          "description": "New role description. Optional."
+        },
+        "level": {
+          "type": "integer",
+          "description": "New access level (0 or higher). Higher levels typically indicate more permissions. Optional."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the role is active and assignable. Optional."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "delete_role",
+    "description": "Deletes a role from the system. CRITICAL: This will fail if any users are currently assigned this role. Reassign users to different roles before deleting.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the role to delete."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "assign_permissions_to_role",
+    "description": "Assigns one or more permissions to a role. This ADDS permissions to the role without removing existing ones. WORKFLOW: 1) Call list_permissions to see available permissions, 2) Call this tool with array of permission IDs to assign. Use this to grant additional capabilities to a role.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "integer",
+          "description": "ID of the role to assign permissions to."
+        },
+        "permissionIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Array of permission IDs to assign to this role. Example: [1, 2, 5, 8]"
+        }
+      },
+      "required": [
+        "roleId",
+        "permissionIds"
+      ]
+    }
+  },
+  {
+    "name": "remove_permission_from_role",
+    "description": "Removes a specific permission from a role. Use this to revoke a capability from a role without affecting other permissions.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "integer",
+          "description": "ID of the role to remove permission from."
+        },
+        "permissionId": {
+          "type": "integer",
+          "description": "ID of the permission to remove."
+        }
+      },
+      "required": [
+        "roleId",
+        "permissionId"
+      ]
+    }
+  },
+  {
+    "name": "list_permissions",
+    "description": "Lists all permissions in the system. Permissions define granular access control for resources and actions. Each permission has a resource (e.g., 'users', 'clients') and action ('create', 'read', 'update', 'delete'). Use this to see available permissions when configuring roles.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of results. Default: 10. Use higher values (e.g., 100) to get all permissions."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Pagination offset. Default: 0."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "create_permission",
+    "description": "Creates a new permission for resource-based access control. Permissions follow the pattern 'action:resource' (e.g., 'create:clients', 'read:users'). Use this to define new capabilities in the system.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Permission name (3-100 characters). Example: 'Create Clients', 'Read Users'"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what this permission allows."
+        },
+        "resource": {
+          "type": "string",
+          "description": "Resource this permission applies to. Examples: 'users', 'clients', 'interactions', 'campaigns'"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "create",
+            "read",
+            "update",
+            "delete"
+          ],
+          "description": "Action this permission grants. One of: create, read, update, delete"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether this permission is active. Default: true"
+        }
+      },
+      "required": [
+        "name",
+        "resource",
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "get_permission",
+    "description": "Retrieves detailed information about a specific permission including its resource, action, and active status.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Permission ID to retrieve."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "update_permission",
+    "description": "Updates an existing permission. All fields except 'id' are optional.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the permission to update."
+        },
+        "name": {
+          "type": "string",
+          "description": "New permission name (3-100 characters). Optional."
+        },
+        "description": {
+          "type": "string",
+          "description": "New description. Optional."
+        },
+        "resource": {
+          "type": "string",
+          "description": "New resource. Optional."
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "create",
+            "read",
+            "update",
+            "delete"
+          ],
+          "description": "New action. Optional."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "New active status. Optional."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "delete_permission",
+    "description": "Deletes a permission from the system. CRITICAL: This will remove the permission from all roles that have it assigned.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the permission to delete."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "update_team",
+    "description": "Updates an existing team's information. All fields except 'id' are optional - only provide fields you want to change.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the team to update. REQUIRED."
+        },
+        "name": {
+          "type": "string",
+          "description": "New team name (2-100 characters). Optional."
+        },
+        "description": {
+          "type": "string",
+          "description": "New team description (max 500 characters). Optional."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the team is active. Optional."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "delete_team",
+    "description": "Deletes a team from the system. This will also remove all client-team associations. Users in the team are not deleted.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the team to delete."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "get_team_clients",
+    "description": "Retrieves all clients assigned to a specific team. Returns client details and pagination metadata. Use this to see which clients a team manages.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Team ID to get clients for."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of results. Default: 10."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Pagination offset. Default: 0."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "assign_client_to_team",
+    "description": "Assigns a client to a team. A client can be assigned to multiple teams. Use this to establish team-client relationships for access control and organization.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Team ID to assign client to."
+        },
+        "clientId": {
+          "type": "integer",
+          "description": "Client ID to assign to the team."
+        }
+      },
+      "required": [
+        "id",
+        "clientId"
+      ]
+    }
+  },
+  {
+    "name": "remove_client_from_team",
+    "description": "Removes a client from a team. Does not delete the client or team - only removes the association.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Team ID to remove client from."
+        },
+        "clientId": {
+          "type": "integer",
+          "description": "Client ID to remove from the team."
+        }
+      },
+      "required": [
+        "id",
+        "clientId"
+      ]
+    }
+  },
+  {
+    "name": "create_client_type",
+    "description": "Creates a new client type category. Client types are used to classify clients (e.g., 'Individual', 'Corporation', 'Trust'). Types can be ordered for display purposes.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Client type name. Example: 'Individual', 'Corporation', 'Family Office'"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of this client type."
+        },
+        "displayOrder": {
+          "type": "integer",
+          "description": "Display order for sorting in UI. Lower numbers appear first."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether this type is active and can be assigned. Default: true"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "get_client_type",
+    "description": "Retrieves detailed information about a specific client type.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Client type ID to retrieve."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "update_client_type",
+    "description": "Updates an existing client type. All fields except 'id' are optional.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the client type to update."
+        },
+        "name": {
+          "type": "string",
+          "description": "New name. Optional."
+        },
+        "description": {
+          "type": "string",
+          "description": "New description. Optional."
+        },
+        "displayOrder": {
+          "type": "integer",
+          "description": "New display order. Optional."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "New active status. Optional."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "update_client_type_order",
+    "description": "Reorders client types for display purposes. Accepts an array of {id, displayOrder} objects to set the sequence. Use this to control how client types appear in dropdown menus.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "typeOrders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "Client type ID"
+              },
+              "displayOrder": {
+                "type": "integer",
+                "description": "New display order (lower numbers first)"
+              }
+            },
+            "required": [
+              "id",
+              "displayOrder"
+            ]
+          },
+          "description": "Array of client type ID and order pairs. Example: [{\"id\": 1, \"displayOrder\": 1}, {\"id\": 2, \"displayOrder\": 2}]"
+        }
+      },
+      "required": [
+        "typeOrders"
+      ]
+    }
+  },
+  {
+    "name": "delete_client_type",
+    "description": "Deletes a client type. CRITICAL: This will fail if any clients are currently assigned this type. Reassign clients first.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the client type to delete."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "create_client_category",
+    "description": "Creates a new client category. Categories provide additional classification (e.g., 'Offshore', 'High Net Worth', 'Corporate'). Clients can have multiple categories.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Category name. Example: 'High Net Worth', 'Corporate', 'Offshore'"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of this category."
+        },
+        "displayOrder": {
+          "type": "integer",
+          "description": "Display order for sorting. Lower numbers appear first."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether category is active. Default: true"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "update_client_category",
+    "description": "Updates an existing client category. All fields except 'id' are optional.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the category to update."
+        },
+        "name": {
+          "type": "string",
+          "description": "New name. Optional."
+        },
+        "description": {
+          "type": "string",
+          "description": "New description. Optional."
+        },
+        "displayOrder": {
+          "type": "integer",
+          "description": "New display order. Optional."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "New active status. Optional."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "update_client_category_order",
+    "description": "Reorders client categories for display purposes. Controls the sequence of categories in UI elements.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "categoryOrders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "displayOrder": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "displayOrder"
+            ]
+          },
+          "description": "Array of category ID and order pairs."
+        }
+      },
+      "required": [
+        "categoryOrders"
+      ]
+    }
+  },
+  {
+    "name": "delete_client",
+    "description": "Soft deletes a client from the CRM. The client record is marked as inactive to preserve historical data and referential integrity. Use with caution.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the client to delete."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "get_client_categories",
+    "description": "Retrieves all categories assigned to a specific client. Returns array of category details.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Client ID to get categories for."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "assign_category_to_client",
+    "description": "Assigns a category to a client. Clients can have multiple categories. Use this to add classifications like 'High Net Worth', 'Offshore', etc.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Client ID to assign category to."
+        },
+        "categoryId": {
+          "type": "integer",
+          "description": "Category ID to assign. Call list_client_categories to see available categories."
+        }
+      },
+      "required": [
+        "id",
+        "categoryId"
+      ]
+    }
+  },
+  {
+    "name": "remove_category_from_client",
+    "description": "Removes a category from a client. Only removes the association - doesn't delete the category or client.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Client ID to remove category from."
+        },
+        "categoryId": {
+          "type": "integer",
+          "description": "Category ID to remove."
+        }
+      },
+      "required": [
+        "id",
+        "categoryId"
+      ]
+    }
+  },
+  {
+    "name": "get_client_teams",
+    "description": "Retrieves all teams assigned to a specific client. Returns array of team details.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Client ID to get teams for."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "assign_team_to_client",
+    "description": "Assigns a team to a client. Clients can be managed by multiple teams. Use this to establish team-client relationships.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Client ID to assign team to."
+        },
+        "teamId": {
+          "type": "integer",
+          "description": "Team ID to assign. Call list_teams to see available teams."
+        }
+      },
+      "required": [
+        "id",
+        "teamId"
+      ]
+    }
+  },
+  {
+    "name": "remove_team_from_client",
+    "description": "Removes a team from a client. Only removes the association - doesn't delete the team or client.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Client ID to remove team from."
+        },
+        "teamId": {
+          "type": "integer",
+          "description": "Team ID to remove."
+        }
+      },
+      "required": [
+        "id",
+        "teamId"
+      ]
+    }
+  },
+  {
+    "name": "update_contact",
+    "description": "Updates an existing contact's information. All fields except 'clientId' and 'contactId' are optional.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "integer",
+          "description": "ID of the client this contact belongs to. REQUIRED for path construction."
+        },
+        "contactId": {
+          "type": "integer",
+          "description": "ID of the contact to update. REQUIRED."
+        },
+        "name": {
+          "type": "string",
+          "description": "New contact name. Optional."
+        },
+        "email": {
+          "type": "string",
+          "description": "New email address. Optional."
+        },
+        "phone": {
+          "type": "string",
+          "description": "New phone number. Optional."
+        },
+        "roleId": {
+          "type": "integer",
+          "description": "New contact role ID. Call list_contact_roles to see available roles. Optional."
+        }
+      },
+      "required": [
+        "clientId",
+        "contactId"
+      ]
+    }
+  },
+  {
+    "name": "remove_contact_from_client",
+    "description": "Removes a contact from a client. Soft deletes the contact record.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "integer",
+          "description": "Client ID the contact belongs to."
+        },
+        "contactId": {
+          "type": "integer",
+          "description": "Contact ID to remove."
+        }
+      },
+      "required": [
+        "clientId",
+        "contactId"
+      ]
+    }
+  },
+  {
+    "name": "get_clients_with_due_interactions",
+    "description": "Retrieves clients with overdue interaction follow-ups based on their configured interaction frequency rules. Each client can have frequency rules (e.g., 'contact every 30 days'). This tool identifies clients whose last interaction exceeded their frequency threshold. CRITICAL for proactive relationship management. Use for queries like 'which clients need follow-up?', 'show overdue clients', 'clients we haven't contacted recently'. Returns clients sorted by how overdue they are (most overdue first).",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "update_contact_role_order",
+    "description": "Reorders contact roles for display purposes. Controls the sequence of roles in UI dropdowns and lists.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "roleOrders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "displayOrder": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "displayOrder"
+            ]
+          },
+          "description": "Array of role ID and order pairs."
+        }
+      },
+      "required": [
+        "roleOrders"
+      ]
+    }
+  },
+  {
+    "name": "update_interaction_type_order",
+    "description": "Reorders interaction types for display purposes. Controls the sequence of interaction types in UI elements.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "typeOrders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "displayOrder": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "displayOrder"
+            ]
+          },
+          "description": "Array of interaction type ID and order pairs."
+        }
+      },
+      "required": [
+        "typeOrders"
+      ]
+    }
+  },
+  {
+    "name": "update_account_platform_order",
+    "description": "Reorders account platforms for display purposes. Controls the sequence of platforms in UI dropdowns.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "platformOrders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "displayOrder": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "displayOrder"
+            ]
+          },
+          "description": "Array of platform ID and order pairs."
+        }
+      },
+      "required": [
+        "platformOrders"
+      ]
+    }
+  },
+  {
+    "name": "update_account_type_order",
+    "description": "Reorders account types for display purposes. Controls the sequence of account types in UI elements.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "typeOrders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "displayOrder": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "displayOrder"
+            ]
+          },
+          "description": "Array of account type ID and order pairs."
+        }
+      },
+      "required": [
+        "typeOrders"
+      ]
+    }
+  },
+  {
+    "name": "delete_interaction",
+    "description": "Deletes an interaction record. Use with caution as this removes historical interaction data.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID of the interaction to delete."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "get_interactions_by_client",
+    "description": "Retrieves all interactions for a specific client. Returns interactions with full details including contacts, users, and follow-up information. Supports all standard interaction filters (date ranges, types, semantic search, etc.).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "integer",
+          "description": "Client ID to get interactions for."
+        },
+        "searchSummary": {
+          "type": "string",
+          "description": "Search by summary text (partial match)"
+        },
+        "filterInteractionType": {
+          "type": "integer",
+          "description": "Filter by interaction type ID"
+        },
+        "dateFrom": {
+          "type": "string",
+          "description": "Filter from date (YYYY-MM-DD)"
+        },
+        "dateTo": {
+          "type": "string",
+          "description": "Filter until date (YYYY-MM-DD)"
+        },
+        "followUpDateFrom": {
+          "type": "string",
+          "description": "Filter by follow-up date from (YYYY-MM-DD)"
+        },
+        "followUpDateTo": {
+          "type": "string",
+          "description": "Filter by follow-up date until (YYYY-MM-DD)"
+        },
+        "hasFollowUp": {
+          "type": "boolean",
+          "description": "Filter by whether interaction has follow-up"
+        },
+        "sortBy": {
+          "type": "string",
+          "description": "Sort field. Options: 'date', 'created_at'"
+        },
+        "sortOrder": {
+          "type": "string",
+          "description": "Sort direction: 'asc' or 'desc'"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum results. Default: 10"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Pagination offset. Default: 0"
+        }
+      },
+      "required": [
+        "clientId"
+      ]
+    }
+  },
+  {
+    "name": "get_notification",
+    "description": "Retrieves detailed information about a specific notification including title, description, type, priority, and related entity references.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Notification ID to retrieve."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "delete_notification",
+    "description": "Deletes a notification from the user's notification list. Permanently removes the notification.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Notification ID to delete."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "get_unread_notifications_count",
+    "description": "TOKEN OPTIMIZATION: Returns only the count of unread notifications without fetching notification details. Extremely lightweight endpoint perfect for badge displays or quick checks. Use this instead of list_notifications when you only need the count.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "orchestrator_chat",
+    "description": "Interact with the AI orchestrator for natural language queries about CRM data. The orchestrator can understand complex queries and automatically call other MCP tools to fulfill requests. EXAMPLES: 'Show me all clients we haven't contacted in the last 30 days' → orchestrator calls list_clients + list_interactions and analyzes. 'Create a follow-up task for offshore clients' → orchestrator analyzes and executes. CONTEXT: Optionally provide conversationId to maintain conversation history for follow-up questions. The orchestrator has access to all CRM tools and can chain multiple operations. Use this for complex queries requiring analysis or multiple steps. Returns: AI-generated response with data or confirmation of actions taken.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Natural language query or command. Be specific about what you want. Example: 'Which clients in the offshore category have no interactions in January 2026?'"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Optional conversation ID to maintain context for follow-up questions. First message omits this, subsequent messages include the returned conversationId."
+        },
+        "context": {
+          "type": "object",
+          "description": "Optional additional context to inform the AI. Example: {'userRole': 'financial_advisor', 'currentClient': 'Acme Corp'}"
+        }
+      },
+      "required": [
+        "message"
+      ]
+    }
+  },
+  {
+    "name": "orchestrator_transcribe_audio",
+    "description": "Transcribes audio files to text using AI. Useful for converting voice memos, meeting recordings, or phone calls into searchable text. FILE UPLOAD: Provide audio as base64-encoded string. Supports common audio formats (mp3, wav, m4a, etc.). WORKFLOW: 1) Encode audio file to base64, 2) Call this tool with audioData, mimeType, and optional language hint, 3) Receive transcribed text. Use transcribed text to create interaction records or notes.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "audioData": {
+          "type": "string",
+          "description": "Base64-encoded audio file data. Encode the audio file using standard base64 encoding before passing."
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "MIME type of the audio file. Examples: 'audio/mpeg' (mp3), 'audio/wav', 'audio/m4a', 'audio/ogg'"
+        },
+        "language": {
+          "type": "string",
+          "description": "Optional ISO 639-1 language code hint for better transcription accuracy. Examples: 'en' (English), 'es' (Spanish), 'pt' (Portuguese). If not provided, language is auto-detected."
+        }
+      },
+      "required": [
+        "audioData",
+        "mimeType"
+      ]
+    }
+  }
+]

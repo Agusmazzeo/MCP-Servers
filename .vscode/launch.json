@@ -1,0 +1,47 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "ZenCRM MCP Server (stdio)",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/services/zencrm/cmd",
+      "args": ["-mode=stdio"],
+      "cwd": "${workspaceFolder}/services/zencrm",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Allfunds MCP Server (stdio)",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/services/allfunds/cmd",
+      "args": ["-mode=stdio"],
+      "cwd": "${workspaceFolder}/services/allfunds",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "ZenCRM MCP Server (HTTP/SSE) - Port 8080",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/services/zencrm/cmd",
+      "args": ["-mode=http", "-port=8080"],
+      "cwd": "${workspaceFolder}/services/zencrm",
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Allfunds MCP Server (HTTP/SSE) - Port 8081",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/services/allfunds/cmd",
+      "args": ["-mode=http", "-port=8081"],
+      "cwd": "${workspaceFolder}/services/allfunds",
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}
