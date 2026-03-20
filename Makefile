@@ -6,39 +6,40 @@ help: ## Show this help message
 
 install-deps: ## Install dependencies for all modules
 	@echo "Installing dependencies..."
-	cd shared && go mod download
-	cd services/zencrm && go mod download
-	cd services/allfunds && go mod download
+	cd zencrm && go mod download
+	cd allfunds && go mod download
 	@echo "✓ Dependencies installed"
 
 tidy: ## Tidy go modules
 	@echo "Tidying modules..."
-	cd shared && go mod tidy
-	cd services/zencrm && go mod tidy
-	cd services/allfunds && go mod tidy
+	cd zencrm && go mod tidy
+	cd allfunds && go mod tidy
 	@echo "✓ Modules tidied"
 
 build-zencrm: ## Build ZenCRM MCP server
 	@echo "Building ZenCRM MCP server..."
-	cd services/zencrm && go build -o ../../bin/zencrm-mcp ./cmd
+	cd zencrm && go build -o ../bin/zencrm-mcp ./cmd
 	@echo "✓ Built: bin/zencrm-mcp"
 
 build-allfunds: ## Build Allfunds MCP server
 	@echo "Building Allfunds MCP server..."
-	cd services/allfunds && go build -o ../../bin/allfunds-mcp ./cmd
+	cd allfunds && go build -o ../bin/allfunds-mcp ./cmd
 	@echo "✓ Built: bin/allfunds-mcp"
 
 build-all: build-zencrm build-allfunds ## Build all services
 	@echo "✓ All services built"
 
 run-zencrm: ## Run ZenCRM MCP server in stdio mode
-	@cd services/zencrm && go run ./cmd -mode=stdio
+	@cd zencrm && go run ./cmd -mode=stdio
+
+run-allfunds: ## Run Allfunds MCP server in stdio mode
+	@cd allfunds && go run ./cmd -mode=stdio
 
 test: ## Run tests for all modules
-	@echo "Testing shared package..."
-	cd shared && go test ./...
 	@echo "Testing ZenCRM service..."
-	cd services/zencrm && go test ./...
+	cd zencrm && go test ./...
+	@echo "Testing Allfunds service..."
+	cd allfunds && go test ./...
 	@echo "✓ All tests passed"
 
 clean: ## Clean build artifacts

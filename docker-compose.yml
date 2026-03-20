@@ -3,13 +3,14 @@ version: '3.8'
 services:
   zencrm:
     build:
-      context: .
-      dockerfile: Dockerfile.zencrm.deploy
+      context: ./zencrm
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
-      - ZENCRM_API_URL=${ZENCRM_API_URL}
-      - ZENCRM_API_KEY=${ZENCRM_API_KEY}
+      - API_BASE_URL=${API_BASE_URL}
+      - JWT_TOKEN=${JWT_TOKEN}
+      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
@@ -20,14 +21,14 @@ services:
 
   allfunds:
     build:
-      context: .
-      dockerfile: Dockerfile.allfunds.deploy
+      context: ./allfunds
+      dockerfile: Dockerfile
     ports:
       - "8081:8081"
     environment:
-      - GRAPHQL_URL=${GRAPHQL_URL:-https://api.allfunds.dev/graphql}
-      - EMAIL=${EMAIL}
-      - PASSWORD=${PASSWORD}
+      - ALLFUNDS_GRAPHQL_URL=${ALLFUNDS_GRAPHQL_URL:-https://app.allfunds.com/graphql}
+      - ALLFUNDS_EMAIL=${ALLFUNDS_EMAIL}
+      - ALLFUNDS_PASSWORD=${ALLFUNDS_PASSWORD}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/health"]

@@ -17,9 +17,9 @@
       "type": "go",
       "request": "launch",
       "mode": "debug",
-      "program": "${workspaceFolder}/services/allfunds/cmd",
+      "program": "${workspaceFolder}/allfunds/cmd",
       "args": ["-mode=stdio"],
-      "cwd": "${workspaceFolder}/services/allfunds",
+      "cwd": "${workspaceFolder}/allfunds",
       "envFile": "${workspaceFolder}/.env",
       "console": "integratedTerminal"
     },
@@ -28,9 +28,9 @@
       "type": "go",
       "request": "launch",
       "mode": "debug",
-      "program": "${workspaceFolder}/services/zencrm/cmd",
+      "program": "${workspaceFolder}/zencrm/cmd",
       "args": ["-mode=http", "-port=8080"],
-      "cwd": "${workspaceFolder}/services/zencrm",
+      "cwd": "${workspaceFolder}/zencrm",
       "envFile": "${workspaceFolder}/.env"
     },
     {
@@ -38,9 +38,9 @@
       "type": "go",
       "request": "launch",
       "mode": "debug",
-      "program": "${workspaceFolder}/services/allfunds/cmd",
+      "program": "${workspaceFolder}/allfunds/cmd",
       "args": ["-mode=http", "-port=8081"],
-      "cwd": "${workspaceFolder}/services/allfunds",
+      "cwd": "${workspaceFolder}/allfunds",
       "envFile": "${workspaceFolder}/.env"
     }
   ]
