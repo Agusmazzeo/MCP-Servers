@@ -35,6 +35,12 @@ WORKDIR /app
 # Copy the binary from builder
 COPY --from=builder /zencrm-mcp .
 
+# Copy tools directory
+COPY --from=builder /app/tools ./tools
+
+# Set default tools path (can be overridden via environment variable)
+ENV TOOLS_PATH=/app/tools/tools.json
+
 # Expose HTTP port
 EXPOSE 8080
 

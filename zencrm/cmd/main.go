@@ -13,12 +13,21 @@ import (
 	"github.com/Agusmazzeo/zencrm-mcp/internal/tools"
 )
 
+// getToolsPath returns the tools.json path from TOOLS_PATH env var or default
+func getToolsPath() string {
+	if path := os.Getenv("TOOLS_PATH"); path != "" {
+		return path
+	}
+	return "tools/tools.json" // default for local development
+}
+
 func main() {
 	log.SetOutput(os.Stderr) // Log to stderr so it doesn't interfere with stdio communication
 
 	// Parse command-line flags
 	mode := flag.String("mode", "stdio", "Transport mode: stdio or http")
 	port := flag.Int("port", 8080, "HTTP port (only used in http mode)")
+	toolsPath := flag.String("tools", getToolsPath(), "Path to tools.json file")
 	flag.Parse()
 
 	// 1. Load configuration
@@ -48,10 +57,10 @@ func main() {
 	obs.Logger.Info("API client created")
 
 	// 4. Load tool definitions
-	obs.Logger.Info("Loading tool definitions")
-	toolDefs, err := tools.LoadTools("tools/tools.json")
+	obs.Logger.Info("Loading tool definitions", "path", *toolsPath)
+	toolDefs, err := tools.LoadTools(*toolsPath)
 	if err != nil {
-		obs.Logger.Error("Failed to load tools", "error", err)
+		obs.Logger.Error("Failed to load tools", "error", err, "path", *toolsPath)
 		log.Fatalf("Failed to load tools: %v", err)
 	}
 	obs.Logger.Info("Tool definitions loaded", "count", len(toolDefs))

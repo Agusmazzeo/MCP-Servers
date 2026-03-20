@@ -12,11 +12,20 @@ import (
 	"github.com/Agusmazzeo/allfunds-mcp/internal/tools"
 )
 
+// getToolsPath returns the tools.json path from TOOLS_PATH env var or default
+func getToolsPath() string {
+	if path := os.Getenv("TOOLS_PATH"); path != "" {
+		return path
+	}
+	return "tools/tools.json" // default for local development
+}
+
 func main() {
 	log.SetOutput(os.Stderr)
 
 	mode := flag.String("mode", "stdio", "Transport mode: stdio or http")
 	port := flag.Int("port", 8080, "HTTP port (only used in http mode)")
+	toolsPath := flag.String("tools", getToolsPath(), "Path to tools.json file")
 	flag.Parse()
 
 	// Load config
@@ -37,7 +46,8 @@ func main() {
 
 	// Load tools
 	log.Println("Loading tool definitions...")
-	toolDefs, err := tools.LoadTools("tools/tools.json")
+	log.Printf("Tools path: %s", *toolsPath)
+	toolDefs, err := tools.LoadTools(*toolsPath)
 	if err != nil {
 		log.Fatalf("Failed to load tools: %v", err)
 	}
