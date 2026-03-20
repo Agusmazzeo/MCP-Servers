@@ -56,13 +56,41 @@ make clean
 docker-compose up --build
 
 # Build individual services
-docker build -f services/zencrm/Dockerfile -t zencrm-mcp .
-docker build -f services/allfunds/Dockerfile -t allfunds-mcp .
+docker build -f Dockerfile.zencrm.deploy -t zencrm-mcp .
+docker build -f Dockerfile.allfunds.deploy -t allfunds-mcp .
 
 # Run individual containers
 docker run -p 8080:8080 -e ZENCRM_API_URL=$ZENCRM_API_URL -e ZENCRM_API_KEY=$ZENCRM_API_KEY zencrm-mcp
 docker run -p 8081:8081 -e GRAPHQL_URL=$GRAPHQL_URL -e EMAIL=$EMAIL -e PASSWORD=$PASSWORD allfunds-mcp
 ```
+
+## Deployment
+
+### DigitalOcean App Platform
+
+Deploy using the included app spec:
+
+```bash
+# Using doctl CLI
+doctl apps create --spec .do/app.yaml
+
+# Or via DigitalOcean dashboard:
+# 1. Create New App
+# 2. Select GitHub repo: Agusmazzeo/MCP-Servers
+# 3. Import from .do/app.yaml
+# 4. Configure environment variables (secrets)
+# 5. Deploy
+```
+
+**Required Environment Variables:**
+- ZenCRM: `ZENCRM_API_URL`, `ZENCRM_API_KEY`
+- Allfunds: `EMAIL`, `PASSWORD` (optional: `GRAPHQL_URL`)
+
+The app spec configures:
+- Both services with health checks
+- Auto-deploy on push to master
+- Correct Dockerfile paths with root build context
+- Port mappings (8080, 8081)
 
 ## Services
 

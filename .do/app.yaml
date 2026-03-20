@@ -1,0 +1,56 @@
+name: mcp-servers
+region: nyc
+
+services:
+  - name: zencrm-mcp
+    github:
+      repo: Agusmazzeo/MCP-Servers
+      branch: master
+      deploy_on_push: true
+    dockerfile_path: Dockerfile.zencrm.deploy
+    source_dir: /
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 10
+      period_seconds: 30
+      timeout_seconds: 10
+      success_threshold: 1
+      failure_threshold: 3
+    envs:
+      - key: ZENCRM_API_URL
+        scope: RUN_TIME
+        type: SECRET
+      - key: ZENCRM_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+
+  - name: allfunds-mcp
+    github:
+      repo: Agusmazzeo/MCP-Servers
+      branch: master
+      deploy_on_push: true
+    dockerfile_path: Dockerfile.allfunds.deploy
+    source_dir: /
+    http_port: 8081
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 10
+      period_seconds: 30
+      timeout_seconds: 10
+      success_threshold: 1
+      failure_threshold: 3
+    envs:
+      - key: GRAPHQL_URL
+        scope: RUN_TIME
+        value: https://api.allfunds.dev/graphql
+      - key: EMAIL
+        scope: RUN_TIME
+        type: SECRET
+      - key: PASSWORD
+        scope: RUN_TIME
+        type: SECRET
