@@ -30,9 +30,11 @@ See [docs/creating-services.md](docs/creating-services.md) to add a new service.
 
 ## Build Commands
 
+### Local Development
 ```bash
 # Build specific service
 make build-zencrm
+make build-allfunds
 
 # Build all services
 make build-all
@@ -47,11 +49,31 @@ make test
 make clean
 ```
 
+### Docker
+
+```bash
+# Build and run with docker-compose
+docker-compose up --build
+
+# Build individual services
+docker build -f services/zencrm/Dockerfile -t zencrm-mcp .
+docker build -f services/allfunds/Dockerfile -t allfunds-mcp .
+
+# Run individual containers
+docker run -p 8080:8080 -e ZENCRM_API_URL=$ZENCRM_API_URL -e ZENCRM_API_KEY=$ZENCRM_API_KEY zencrm-mcp
+docker run -p 8081:8081 -e GRAPHQL_URL=$GRAPHQL_URL -e EMAIL=$EMAIL -e PASSWORD=$PASSWORD allfunds-mcp
+```
+
 ## Services
 
 ### ZenCRM ✅
 CRM management with 100+ tools - Production ready
+- HTTP/SSE transport
+- Port: 8080
 
-### Allfunds 🚧
-Fund platform via GraphQL - In progress
+### Allfunds ✅
+Fund platform via GraphQL - Production ready
+- OAuth 2.0 + PKCE authentication
+- HTTP/SSE transport
+- Port: 8081
 

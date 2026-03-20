@@ -4,7 +4,7 @@ services:
   zencrm:
     build:
       context: .
-      dockerfile: Dockerfile.zencrm
+      dockerfile: services/zencrm/Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -21,7 +21,7 @@ services:
   allfunds:
     build:
       context: .
-      dockerfile: Dockerfile.allfunds
+      dockerfile: services/allfunds/Dockerfile
     ports:
       - "8081:8081"
     environment:
