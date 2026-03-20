@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	sharedconfig "github.com/Criteria/MCP-Servers/shared/pkg/config"
+	sharedconfig "github.com/Agusmazzeo/MCP-Servers/shared/pkg/config"
 	zenconfig "github.com/Agusmazzeo/ZenCRM/app/config"
 	"github.com/joho/godotenv"
 )

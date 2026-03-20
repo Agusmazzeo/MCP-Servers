@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Criteria/MCP-Servers/shared/pkg/tools"
-	"github.com/Criteria/MCP-Servers/shared/pkg/transport"
+	"github.com/Agusmazzeo/MCP-Servers/shared/pkg/tools"
+	"github.com/Agusmazzeo/MCP-Servers/shared/pkg/transport"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

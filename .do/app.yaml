@@ -7,8 +7,8 @@ services:
       repo: Agusmazzeo/MCP-Servers
       branch: master
       deploy_on_push: true
-    dockerfile_path: Dockerfile.zencrm.deploy
-    source_dir: /
+    dockerfile_path: Dockerfile
+    source_dir: services/zencrm
     http_port: 8080
     instance_count: 1
     instance_size_slug: basic-xxs
@@ -32,8 +32,8 @@ services:
       repo: Agusmazzeo/MCP-Servers
       branch: master
       deploy_on_push: true
-    dockerfile_path: Dockerfile.allfunds.deploy
-    source_dir: /
+    dockerfile_path: Dockerfile
+    source_dir: services/allfunds
     http_port: 8081
     instance_count: 1
     instance_size_slug: basic-xxs

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Criteria/MCP-Servers/services/allfunds/internal/graphql"
+	"github.com/Agusmazzeo/MCP-Servers/services/allfunds/internal/graphql"
 )
 
 // OAuthState represents an OAuth authorization state

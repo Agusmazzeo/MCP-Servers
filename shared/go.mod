@@ -1,4 +1,4 @@
-module github.com/Criteria/MCP-Servers/shared
+module github.com/Agusmazzeo/MCP-Servers/shared
 
 go 1.24.11
 

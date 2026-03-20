@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Criteria/MCP-Servers/services/allfunds/internal/graphql"
+	"github.com/Agusmazzeo/MCP-Servers/services/allfunds/internal/graphql"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Criteria/MCP-Servers/shared/pkg/tools"
+	"github.com/Agusmazzeo/MCP-Servers/shared/pkg/tools"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

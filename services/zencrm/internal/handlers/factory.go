@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Criteria/MCP-Servers/services/zencrm/internal/apiclient"
-	"github.com/Criteria/MCP-Servers/services/zencrm/internal/metadata"
+	"github.com/Agusmazzeo/MCP-Servers/services/zencrm/internal/apiclient"
+	"github.com/Agusmazzeo/MCP-Servers/services/zencrm/internal/metadata"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

@@ -1,7 +1,7 @@
 package config
 
 import (
-	sharedconfig "github.com/Criteria/MCP-Servers/shared/pkg/config"
+	sharedconfig "github.com/Agusmazzeo/MCP-Servers/shared/pkg/config"
 	"github.com/joho/godotenv"
 )
 

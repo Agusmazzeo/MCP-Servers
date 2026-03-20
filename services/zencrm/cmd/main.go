@@ -6,11 +6,11 @@ import (
 	"os"
 
 	"github.com/Agusmazzeo/ZenCRM/app/observability"
-	"github.com/Criteria/MCP-Servers/services/zencrm/internal/apiclient"
-	"github.com/Criteria/MCP-Servers/services/zencrm/internal/config"
-	"github.com/Criteria/MCP-Servers/services/zencrm/internal/handlers"
-	"github.com/Criteria/MCP-Servers/shared/pkg/server"
-	"github.com/Criteria/MCP-Servers/shared/pkg/tools"
+	"github.com/Agusmazzeo/MCP-Servers/services/zencrm/internal/apiclient"
+	"github.com/Agusmazzeo/MCP-Servers/services/zencrm/internal/config"
+	"github.com/Agusmazzeo/MCP-Servers/services/zencrm/internal/handlers"
+	"github.com/Agusmazzeo/MCP-Servers/shared/pkg/server"
+	"github.com/Agusmazzeo/MCP-Servers/shared/pkg/tools"
 )
 
 func main() {

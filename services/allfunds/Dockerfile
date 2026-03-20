@@ -1,28 +1,34 @@
+# Dockerfile for Allfunds MCP Server
+# Build context: services/allfunds/
+# This Dockerfile is designed for DigitalOcean App Platform deployment
+
 # Build stage
 FROM golang:1.23-alpine AS builder
 
-WORKDIR /build
+# Install git (required for go mod download from GitHub)
+RUN apk add --no-cache git
+
+# Allow Go to download newer toolchain versions automatically
+ENV GOTOOLCHAIN=auto
+
+WORKDIR /app
 
 # Copy go mod files
-COPY shared/go.mod shared/go.sum ./shared/
-COPY services/allfunds/go.mod services/allfunds/go.sum ./services/allfunds/
+COPY go.mod go.sum ./
 
-# Download dependencies
-RUN cd shared && go mod download
-RUN cd services/allfunds && go mod download
+# Download dependencies (shared package will be fetched from GitHub)
+RUN go mod download
 
 # Copy source code
-COPY shared/ ./shared/
-COPY services/allfunds/ ./services/allfunds/
+COPY . ./
 
 # Build the binary
-RUN cd services/allfunds && \
-    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /allfunds-mcp ./cmd
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /allfunds-mcp ./cmd
 
 # Runtime stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates wget
 
 WORKDIR /app
 

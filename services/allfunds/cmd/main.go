@@ -5,12 +5,12 @@ import (
 	"log"
 	"os"
 
-	"github.com/Criteria/MCP-Servers/services/allfunds/internal/config"
-	"github.com/Criteria/MCP-Servers/services/allfunds/internal/graphql"
-	"github.com/Criteria/MCP-Servers/services/allfunds/internal/handlers"
-	"github.com/Criteria/MCP-Servers/services/allfunds/internal/transport"
-	"github.com/Criteria/MCP-Servers/shared/pkg/server"
-	"github.com/Criteria/MCP-Servers/shared/pkg/tools"
+	"github.com/Agusmazzeo/MCP-Servers/services/allfunds/internal/config"
+	"github.com/Agusmazzeo/MCP-Servers/services/allfunds/internal/graphql"
+	"github.com/Agusmazzeo/MCP-Servers/services/allfunds/internal/handlers"
+	"github.com/Agusmazzeo/MCP-Servers/services/allfunds/internal/transport"
+	"github.com/Agusmazzeo/MCP-Servers/shared/pkg/server"
+	"github.com/Agusmazzeo/MCP-Servers/shared/pkg/tools"
 )
 
 func main() {

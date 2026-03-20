@@ -1,10 +1,10 @@
-module github.com/Criteria/MCP-Servers/services/zencrm
+module github.com/Agusmazzeo/MCP-Servers/services/zencrm
 
 go 1.24.11
 
 require (
 	github.com/Agusmazzeo/ZenCRM v1.0.0
-	github.com/Criteria/MCP-Servers/shared v0.0.0
+	github.com/Agusmazzeo/MCP-Servers/shared v0.0.0-20250320232656-0c8cd83f7a8e
 	github.com/joho/godotenv v1.5.1
 	github.com/modelcontextprotocol/go-sdk v1.4.0
 )
@@ -56,5 +56,3 @@ require (
 	google.golang.org/grpc v1.77.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )
-
-replace github.com/Criteria/MCP-Servers/shared => ../../shared

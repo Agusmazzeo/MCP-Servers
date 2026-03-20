@@ -1,28 +1,34 @@
+# Dockerfile for ZenCRM MCP Server
+# Build context: services/zencrm/
+# This Dockerfile is designed for DigitalOcean App Platform deployment
+
 # Build stage
 FROM golang:1.23-alpine AS builder
 
-WORKDIR /build
+# Install git (required for go mod download from GitHub)
+RUN apk add --no-cache git
+
+# Allow Go to download newer toolchain versions automatically
+ENV GOTOOLCHAIN=auto
+
+WORKDIR /app
 
 # Copy go mod files
-COPY shared/go.mod shared/go.sum ./shared/
-COPY services/zencrm/go.mod services/zencrm/go.sum ./services/zencrm/
+COPY go.mod go.sum ./
 
-# Download dependencies
-RUN cd shared && go mod download
-RUN cd services/zencrm && go mod download
+# Download dependencies (shared package will be fetched from GitHub)
+RUN go mod download
 
 # Copy source code
-COPY shared/ ./shared/
-COPY services/zencrm/ ./services/zencrm/
+COPY . ./
 
 # Build the binary
-RUN cd services/zencrm && \
-    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /zencrm-mcp ./cmd
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /zencrm-mcp ./cmd
 
 # Runtime stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates wget
 
 WORKDIR /app
 

@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Criteria/MCP-Servers/services/zencrm/internal/config"
+	"github.com/Agusmazzeo/MCP-Servers/services/zencrm/internal/config"
 )
 
 const MaxResponseSize = 80000 // 80KB limit for responses

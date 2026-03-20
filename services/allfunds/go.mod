@@ -1,9 +1,9 @@
-module github.com/Criteria/MCP-Servers/services/allfunds
+module github.com/Agusmazzeo/MCP-Servers/services/allfunds
 
 go 1.24.11
 
 require (
-	github.com/Criteria/MCP-Servers/shared v0.0.0
+	github.com/Agusmazzeo/MCP-Servers/shared v0.0.0-20250320232656-0c8cd83f7a8e
 	github.com/joho/godotenv v1.5.1
 )
 
@@ -16,5 +16,3 @@ require (
 	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 )
-
-replace github.com/Criteria/MCP-Servers/shared => ../../shared
