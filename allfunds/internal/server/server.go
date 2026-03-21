@@ -389,8 +389,11 @@ func (s *Server) handleToolsList(message map[string]interface{}) map[string]inte
 
 // handleToolCall executes a tool with authenticated client
 func (s *Server) handleToolCall(message map[string]interface{}, allfundsClient *graphql.Client) map[string]interface{} {
+	log.Printf("[ToolCall] Received tool call request")
+
 	params, ok := message["params"].(map[string]interface{})
 	if !ok {
+		log.Printf("[ToolCall] ERROR: Invalid params in message")
 		return map[string]interface{}{
 			"jsonrpc": "2.0",
 			"id":      message["id"],
@@ -403,6 +406,7 @@ func (s *Server) handleToolCall(message map[string]interface{}, allfundsClient *
 
 	toolName, _ := params["name"].(string)
 	arguments, _ := params["arguments"].(map[string]interface{})
+	log.Printf("[ToolCall] Tool: %s, Arguments: %+v", toolName, arguments)
 
 	// Find tool definition
 	var toolDef *tools.ToolDefinition
@@ -414,6 +418,7 @@ func (s *Server) handleToolCall(message map[string]interface{}, allfundsClient *
 	}
 
 	if toolDef == nil {
+		log.Printf("[ToolCall] ERROR: Tool not found: %s (available tools: %d)", toolName, len(s.toolDefs))
 		return map[string]interface{}{
 			"jsonrpc": "2.0",
 			"id":      message["id"],
@@ -423,16 +428,19 @@ func (s *Server) handleToolCall(message map[string]interface{}, allfundsClient *
 			},
 		}
 	}
+	log.Printf("[ToolCall] Tool definition found: %s", toolName)
 
 	// Create handler factory with authenticated client
+	log.Printf("[ToolCall] Creating handler factory with authenticated client")
 	factory := handlers.NewHandlerFactory(allfundsClient)
 	handler := factory.CreateHandler(toolName)
 
 	// Execute tool handler
+	log.Printf("[ToolCall] Executing tool handler for: %s", toolName)
 	ctx := context.Background()
 	result, _, err := handler(ctx, nil, arguments)
 	if err != nil {
-		log.Printf("Tool execution failed: tool=%s error=%v", toolName, err)
+		log.Printf("[ToolCall] ERROR: Tool execution failed: tool=%s error=%v", toolName, err)
 		return map[string]interface{}{
 			"jsonrpc": "2.0",
 			"id":      message["id"],
@@ -452,6 +460,7 @@ func (s *Server) handleToolCall(message map[string]interface{}, allfundsClient *
 				errorText = textContent.Text
 			}
 		}
+		log.Printf("[ToolCall] ERROR: Tool returned error result: tool=%s error=%s", toolName, errorText)
 		return map[string]interface{}{
 			"jsonrpc": "2.0",
 			"id":      message["id"],
@@ -470,6 +479,8 @@ func (s *Server) handleToolCall(message map[string]interface{}, allfundsClient *
 			resultText = textContent.Text
 		}
 	}
+
+	log.Printf("[ToolCall] SUCCESS: Tool executed successfully: %s (result length: %d chars)", toolName, len(resultText))
 
 	return map[string]interface{}{
 		"jsonrpc": "2.0",

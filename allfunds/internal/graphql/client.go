@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"time"
@@ -59,6 +60,7 @@ func NewClient(graphqlURL, email, password string) (*Client, error) {
 
 // Login authenticates with Allfunds Connect
 func (c *Client) Login(ctx context.Context) error {
+	log.Printf("[GraphQL] Login: Authenticating with email=%s", c.email)
 	mutation := `
 		mutation LogIn($email: String!, $password: String!) {
 		  log_in(email: $email, password: $password) {
@@ -89,21 +91,27 @@ func (c *Client) Login(ctx context.Context) error {
 	}
 
 	if err := c.execute(ctx, req, &resp); err != nil {
+		log.Printf("[GraphQL] Login: FAILED - %v", err)
 		return fmt.Errorf("login request failed: %w", err)
 	}
 
 	if len(resp.LogIn.Errors) > 0 {
+		log.Printf("[GraphQL] Login: FAILED - errors=%v", resp.LogIn.Errors)
 		return fmt.Errorf("login failed: %v", resp.LogIn.Errors)
 	}
 
 	c.csrfToken = resp.LogIn.CSRFToken
 	c.authenticated = true
+	log.Printf("[GraphQL] Login: SUCCESS - user_id=%s csrf_token=%s...", resp.LogIn.User.ID, c.csrfToken[:10])
 	return nil
 }
 
 // Query executes a GraphQL query with auto-authentication
 func (c *Client) Query(ctx context.Context, operation, query string, variables map[string]interface{}, result interface{}) error {
+	log.Printf("[GraphQL] Query: operation=%s authenticated=%v", operation, c.authenticated)
+
 	if !c.authenticated {
+		log.Printf("[GraphQL] Query: Not authenticated, logging in first")
 		if err := c.Login(ctx); err != nil {
 			return err
 		}
@@ -115,15 +123,23 @@ func (c *Client) Query(ctx context.Context, operation, query string, variables m
 		Variables:     variables,
 	}
 
+	log.Printf("[GraphQL] Query: Executing %s with variables: %+v", operation, variables)
 	err := c.execute(ctx, req, result)
 
 	// Retry once on auth error
 	if isAuthError(err) {
+		log.Printf("[GraphQL] Query: Auth error, retrying with fresh login")
 		c.authenticated = false
 		if loginErr := c.Login(ctx); loginErr != nil {
 			return loginErr
 		}
 		return c.execute(ctx, req, result)
+	}
+
+	if err != nil {
+		log.Printf("[GraphQL] Query: FAILED - operation=%s error=%v", operation, err)
+	} else {
+		log.Printf("[GraphQL] Query: SUCCESS - operation=%s", operation)
 	}
 
 	return err
@@ -186,6 +202,8 @@ func (c *Client) execute(ctx context.Context, gqlReq GraphQLRequest, result inte
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
+	log.Printf("[GraphQL] execute: operation=%s url=%s has_csrf=%v", gqlReq.OperationName, c.graphqlURL, c.csrfToken != "")
+
 	req, err := http.NewRequestWithContext(ctx, "POST", c.graphqlURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -203,16 +221,21 @@ func (c *Client) execute(ctx context.Context, gqlReq GraphQLRequest, result inte
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		log.Printf("[GraphQL] execute: HTTP request failed - %v", err)
 		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	log.Printf("[GraphQL] execute: HTTP %d for operation=%s", resp.StatusCode, gqlReq.OperationName)
+
 	if resp.StatusCode == 401 {
+		log.Printf("[GraphQL] execute: Authentication required (401)")
 		return fmt.Errorf("authentication required")
 	}
 
 	if resp.StatusCode >= 400 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
+		log.Printf("[GraphQL] execute: HTTP error %d - %s", resp.StatusCode, string(bodyBytes))
 		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
@@ -220,13 +243,16 @@ func (c *Client) execute(ctx context.Context, gqlReq GraphQLRequest, result inte
 	gqlResp.Data = result
 
 	if err := json.NewDecoder(resp.Body).Decode(&gqlResp); err != nil {
+		log.Printf("[GraphQL] execute: Failed to decode response - %v", err)
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	if len(gqlResp.Errors) > 0 {
+		log.Printf("[GraphQL] execute: GraphQL errors - %v", gqlResp.Errors)
 		return fmt.Errorf("GraphQL errors: %v", gqlResp.Errors)
 	}
 
+	log.Printf("[GraphQL] execute: Success for operation=%s", gqlReq.OperationName)
 	return nil
 }
 

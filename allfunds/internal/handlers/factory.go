@@ -103,7 +103,7 @@ func (f *HandlerFactory) handleSearchFunds(ctx context.Context, args map[string]
 	pageSize := getIntOrDefault(args, "page_size", 10)
 
 	criteria := map[string]interface{}{
-		"search_string": search,
+		"search": search,
 	}
 
 	if avail, ok := args["available_in_allfunds"].(bool); ok && avail {
@@ -201,7 +201,7 @@ func (f *HandlerFactory) handleListWatchlists(ctx context.Context, args map[stri
 // handleGetPinnedWatchlist gets user's pinned watchlist
 func (f *HandlerFactory) handleGetPinnedWatchlist(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
 	var result struct {
-		PinnedWatchlist map[string]interface{} `json:"pinned_watchlist"`
+		PinnedWatchlist []map[string]interface{} `json:"pinned_watchlist"`
 	}
 
 	err := f.client.Query(ctx, "GetPinnedWatchlist", graphql.GetPinnedWatchlistQuery, nil, &result)
@@ -219,9 +219,8 @@ func (f *HandlerFactory) handleGetFundInsights(ctx context.Context, args map[str
 
 	criteria := map[string]interface{}{}
 
-	if search, ok := args["search"].(string); ok && search != "" {
-		criteria["search"] = search
-	}
+	// Note: ArticleCriteriaInput doesn't support text search
+	// Only hashtags and regions are supported
 
 	if hashtags, ok := args["hashtags"].([]interface{}); ok && len(hashtags) > 0 {
 		criteria["hashtags"] = hashtags
@@ -286,10 +285,16 @@ func (f *HandlerFactory) handleGetWatchlistFunds(ctx context.Context, args map[s
 
 	var result struct {
 		Watchlist struct {
-			ID            string                   `json:"id"`
-			Name          string                   `json:"name"`
-			TotalProducts int                      `json:"total_products"`
-			Products      []map[string]interface{} `json:"paginated_products"`
+			ID            string `json:"id"`
+			Name          string `json:"name"`
+			TotalProducts int    `json:"total_products"`
+			PaginatedProducts struct {
+				Results []map[string]interface{} `json:"results"`
+				PaginationResult struct {
+					TotalCount int `json:"total_count"`
+					PageCount  int `json:"page_count"`
+				} `json:"pagination_result"`
+			} `json:"paginated_products"`
 		} `json:"watchlist"`
 	}
 
@@ -298,7 +303,17 @@ func (f *HandlerFactory) handleGetWatchlistFunds(ctx context.Context, args map[s
 		return errorResult(err)
 	}
 
-	return successResult(result.Watchlist)
+	// Return watchlist info with paginated results
+	response := map[string]interface{}{
+		"id":            result.Watchlist.ID,
+		"name":          result.Watchlist.Name,
+		"total_products": result.Watchlist.TotalProducts,
+		"results":       result.Watchlist.PaginatedProducts.Results,
+		"page_count":    result.Watchlist.PaginatedProducts.PaginationResult.PageCount,
+		"total_count":   result.Watchlist.PaginatedProducts.PaginationResult.TotalCount,
+	}
+
+	return successResult(response)
 }
 
 // handleLoginStatus checks authentication status
@@ -789,7 +804,7 @@ func (f *HandlerFactory) handleDownloadDocument(ctx context.Context, args map[st
 func (f *HandlerFactory) getInternalIDFromISIN(ctx context.Context, isin string) (string, error) {
 	variables := map[string]interface{}{
 		"screeningCriteria": map[string]interface{}{
-			"search_string": isin,
+			"search": isin,
 		},
 		"pagination": map[string]interface{}{
 			"page":      1,

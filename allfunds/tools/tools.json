@@ -83,14 +83,10 @@
   },
   {
     "name": "get_fund_insights",
-    "description": "Obtener artículos y noticias de fondos de Allfunds Connect (Fund Insights). Puede filtrar por hashtags, regiones, tipos de artículo o palabras clave.",
+    "description": "Obtener artículos y noticias de fondos de Allfunds Connect (Fund Insights). Puede filtrar por hashtags y regiones.",
     "input_schema": {
       "type": "object",
       "properties": {
-        "search": {
-          "type": "string",
-          "description": "Búsqueda por título o contenido"
-        },
         "hashtags": {
           "type": "array",
           "items": {
