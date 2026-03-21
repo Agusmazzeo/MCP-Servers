@@ -238,3 +238,14 @@ query GetSimilarAlternativesForProductQuery($product_id: ID!) {
   }
 }
 `
+
+// LoginMutation authenticates user and returns csrf_token
+const LoginMutation = `
+mutation LogIn($email: String!, $password: String!) {
+  log_in(email: $email, password: $password) {
+    user { id }
+    csrf_token
+    errors
+  }
+}
+`

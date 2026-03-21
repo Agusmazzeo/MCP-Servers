@@ -31,15 +31,10 @@ func LoadConfig() (*Config, error) {
 	// Load configuration
 	graphqlURL := GetEnv("ALLFUNDS_GRAPHQL_URL", "https://app.allfunds.com/graphql")
 
-	email, err := RequireEnv("ALLFUNDS_EMAIL")
-	if err != nil {
-		return nil, err
-	}
-
-	password, err := RequireEnv("ALLFUNDS_PASSWORD")
-	if err != nil {
-		return nil, err
-	}
+	// Email and password are optional - only required for stdio mode
+	// For HTTP mode, credentials come from Claude Desktop OAuth config (client_id/client_secret)
+	email := os.Getenv("ALLFUNDS_EMAIL")
+	password := os.Getenv("ALLFUNDS_PASSWORD")
 
 	return &Config{
 		GraphQLURL: graphqlURL,

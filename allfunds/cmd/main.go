@@ -36,13 +36,19 @@ func main() {
 	}
 	log.Printf("✓ Configuration loaded (GraphQL: %s)", cfg.GraphQLURL)
 
-	// Create GraphQL client
-	log.Println("Creating GraphQL client...")
-	client, err := graphql.NewClient(cfg.GraphQLURL, cfg.Email, cfg.Password)
-	if err != nil {
-		log.Fatalf("Failed to create GraphQL client: %v", err)
+	// Create GraphQL client (only for stdio mode)
+	var client *graphql.Client
+	if *mode == "stdio" {
+		if cfg.Email == "" || cfg.Password == "" {
+			log.Fatalf("ALLFUNDS_EMAIL and ALLFUNDS_PASSWORD environment variables are required for stdio mode")
+		}
+		log.Println("Creating GraphQL client...")
+		client, err = graphql.NewClient(cfg.GraphQLURL, cfg.Email, cfg.Password)
+		if err != nil {
+			log.Fatalf("Failed to create GraphQL client: %v", err)
+		}
+		log.Println("✓ GraphQL client created")
 	}
-	log.Println("✓ GraphQL client created")
 
 	// Load tools
 	log.Println("Loading tool definitions...")
@@ -58,14 +64,22 @@ func main() {
 	mcpServer := server.NewServer(&server.ServerConfig{
 		Name:    "allfunds",
 		Version: "1.0.0",
-	})
-	log.Println("✓ MCP server created")
+	}, cfg.GraphQLURL)
+	log.Println("✓ MCP server created with OAuth 2.0 support")
+	log.Println("⚠ Configure client_id (email) and client_secret (password) in Claude Desktop OAuth settings")
 
-	// Create handler factory and register tools
-	log.Println("Creating handler factory...")
-	handlerFactory := handlers.NewHandlerFactory(client)
-	mcpServer.RegisterTools(handlerFactory, toolDefs, true)
-	log.Printf("✓ Tools registered (%d tools)\n", len(toolDefs))
+	// Register tools based on mode
+	if *mode == "stdio" {
+		// For stdio mode: create handler factory and register tools with MCP server
+		log.Println("Creating handler factory...")
+		handlerFactory := handlers.NewHandlerFactory(client)
+		mcpServer.RegisterTools(handlerFactory, toolDefs, true)
+		log.Printf("✓ Tools registered (%d tools)\n", len(toolDefs))
+	} else {
+		// For HTTP mode: just store tool definitions (tools are executed dynamically with OAuth client)
+		mcpServer.SetToolDefinitions(toolDefs)
+		log.Printf("✓ Tool definitions loaded (%d tools)\n", len(toolDefs))
+	}
 
 	log.Println("========================================")
 	log.Println("🚀 Allfunds MCP Server - Production Mode")
