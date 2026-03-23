@@ -3,7 +3,7 @@ version: '3.8'
 services:
   zencrm:
     build:
-      context: ./zencrm
+      context: ./servers/zencrm
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
@@ -21,7 +21,7 @@ services:
 
   allfunds:
     build:
-      context: ./allfunds
+      context: ./servers/allfunds
       dockerfile: Dockerfile
     ports:
       - "8081:8081"
