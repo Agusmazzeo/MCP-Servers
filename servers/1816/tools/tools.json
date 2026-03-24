@@ -1,0 +1,222 @@
+[
+  {
+    "name": "get_session_info",
+    "description": "Get current user session information from 1816 API",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "search_instruments",
+    "description": "Search for fixed income instruments by name, ISIN, or ticker",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query (instrument name, ISIN, or ticker)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum number of results to return (default: 10)"
+        }
+      },
+      "required": ["query"]
+    }
+  },
+  {
+    "name": "get_instrument_indicators",
+    "description": "Get key indicators for a fixed income instrument including yields, duration, spreads",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN code of the instrument"
+        },
+        "mode": {
+          "type": "string",
+          "description": "Calculation mode: 'market' for market prices or 'simulation' for custom price (default: 'market')",
+          "enum": ["market", "simulation"]
+        },
+        "price": {
+          "type": "number",
+          "description": "Custom price for simulation mode (required if mode is 'simulation')"
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "get_instrument_valuation",
+    "description": "Get detailed valuation data for a fixed income instrument",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN code of the instrument"
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "get_screener_filter_options",
+    "description": "Get available filter options for the bond screener",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "run_screener",
+    "description": "Run bond screener with filters to find matching instruments",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filters": {
+          "type": "object",
+          "description": "Screener filters (currency, issuer, rating, maturity, etc.)",
+          "properties": {
+            "currency": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "issuer": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "rating": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "minYield": {
+              "type": "number"
+            },
+            "maxYield": {
+              "type": "number"
+            }
+          }
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum number of results (default: 20)"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_payment_calendar",
+    "description": "Get payment calendar (coupons, principal payments) for instruments",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN code of the instrument (optional, returns all if not specified)"
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Start date for calendar (YYYY-MM-DD)"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "End date for calendar (YYYY-MM-DD)"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_curves_data",
+    "description": "Get yield curve data for different countries and currencies",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "country": {
+          "type": "string",
+          "description": "Country code (e.g., 'US', 'DE', 'AR')"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (e.g., 'USD', 'EUR', 'ARS')"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_historical_series",
+    "description": "Get historical price/yield series for an instrument",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN code of the instrument"
+        },
+        "field": {
+          "type": "string",
+          "description": "Data field to retrieve (e.g., 'price', 'yield', 'spread')",
+          "enum": ["price", "yield", "spread", "duration"]
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Start date (YYYY-MM-DD)"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "End date (YYYY-MM-DD)"
+        }
+      },
+      "required": ["isin", "field"]
+    }
+  },
+  {
+    "name": "get_relative_analysis",
+    "description": "Get relative value analysis comparing similar instruments",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "isin": {
+          "type": "string",
+          "description": "ISIN code of the base instrument"
+        },
+        "compareGroup": {
+          "type": "string",
+          "description": "Comparison group (e.g., 'issuer', 'sector', 'rating')",
+          "enum": ["issuer", "sector", "rating", "maturity"]
+        }
+      },
+      "required": ["isin"]
+    }
+  },
+  {
+    "name": "get_tableau_dashboard_url",
+    "description": "Get the URL for a specific Tableau dashboard",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "dashboardName": {
+          "type": "string",
+          "description": "Name of the Tableau dashboard"
+        }
+      },
+      "required": ["dashboardName"]
+    }
+  },
+  {
+    "name": "login_status",
+    "description": "Check if the user is logged in to 1816 API",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  }
+]

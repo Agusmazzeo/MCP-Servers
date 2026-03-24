@@ -1,0 +1,181 @@
+[
+  {
+    "name": "create_equity_order",
+    "description": "Create an equity (stock) order in OMS",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "isBuy": {
+          "type": "boolean",
+          "description": "True for buy order, false for sell order"
+        },
+        "broker": {
+          "type": "string",
+          "description": "Broker name (pershing/xp, criteria.uy/cuy, stonex/intl_fcs)"
+        },
+        "customer": {
+          "type": "string",
+          "description": "Customer account number"
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Stock ticker symbol"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Number of shares"
+        },
+        "price": {
+          "type": "number",
+          "description": "Price per share (optional for market orders)"
+        },
+        "orderType": {
+          "type": "string",
+          "description": "Order type: 'market' or 'limit' (default: 'market')",
+          "enum": ["market", "limit"]
+        },
+        "commission": {
+          "type": "number",
+          "description": "Commission amount (optional, defaults to $100 minimum)"
+        },
+        "commissionType": {
+          "type": "string",
+          "description": "Commission type: 'cash' or 'percentage' (default: 'cash')",
+          "enum": ["cash", "percentage"]
+        }
+      },
+      "required": ["isBuy", "broker", "customer", "symbol", "quantity"]
+    }
+  },
+  {
+    "name": "create_mutual_fund_order",
+    "description": "Create a mutual fund order in OMS",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "isBuy": {
+          "type": "boolean",
+          "description": "True for buy/subscription, false for sell/redemption"
+        },
+        "broker": {
+          "type": "string",
+          "description": "Broker name (pershing/xp, criteria.uy/cuy, stonex/intl_fcs)"
+        },
+        "customer": {
+          "type": "string",
+          "description": "Customer account number"
+        },
+        "fundName": {
+          "type": "string",
+          "description": "Mutual fund name or ISIN"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Investment amount (for buy) or shares (for sell)"
+        },
+        "commission": {
+          "type": "number",
+          "description": "Commission amount (optional, defaults to $100 minimum)"
+        },
+        "commissionType": {
+          "type": "string",
+          "description": "Commission type: 'cash' or 'percentage' (default: 'percentage' for buy, 'cash' for sell)",
+          "enum": ["cash", "percentage"]
+        }
+      },
+      "required": ["isBuy", "broker", "customer", "fundName", "amount"]
+    }
+  },
+  {
+    "name": "create_bond_order",
+    "description": "Create a bond order in OMS",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "isBuy": {
+          "type": "boolean",
+          "description": "True for buy order, false for sell order"
+        },
+        "broker": {
+          "type": "string",
+          "description": "Broker name (pershing/xp, criteria.uy/cuy, stonex/intl_fcs)"
+        },
+        "customer": {
+          "type": "string",
+          "description": "Customer account number"
+        },
+        "isin": {
+          "type": "string",
+          "description": "Bond ISIN code"
+        },
+        "nominal": {
+          "type": "number",
+          "description": "Nominal amount"
+        },
+        "price": {
+          "type": "number",
+          "description": "Bond price (as percentage of par)"
+        },
+        "commission": {
+          "type": "number",
+          "description": "Commission (optional, defaults to $100 flat)"
+        },
+        "commissionType": {
+          "type": "string",
+          "description": "Commission type: 'principal' (% of principal) or 'cash' (flat $100)",
+          "enum": ["principal", "cash"]
+        }
+      },
+      "required": ["isBuy", "broker", "customer", "isin", "nominal", "price"]
+    }
+  },
+  {
+    "name": "get_brokers",
+    "description": "Get list of available brokers in OMS",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "get_advisors",
+    "description": "Get list of advisors in OMS",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "get_orders",
+    "description": "Get list of orders from OMS",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "customer": {
+          "type": "string",
+          "description": "Filter by customer account number (optional)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by order status (optional)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum number of orders to return (default: 50)"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "oms_login",
+    "description": "Check OMS login status",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  }
+]
