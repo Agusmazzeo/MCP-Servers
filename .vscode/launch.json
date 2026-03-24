@@ -17,10 +17,42 @@
       "type": "go",
       "request": "launch",
       "mode": "debug",
-      "program": "${workspaceFolder}/allfunds/cmd",
+      "program": "${workspaceFolder}/servers/allfunds/cmd",
       "args": ["-mode=stdio"],
-      "cwd": "${workspaceFolder}/allfunds",
+      "cwd": "${workspaceFolder}/servers/allfunds",
       "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "1816 MCP Server (stdio)",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/servers/1816/cmd",
+      "args": ["-mode=stdio"],
+      "cwd": "${workspaceFolder}/servers/1816",
+      "env": {
+        "REFRESH_TOKEN_1816": "${env:REFRESH_TOKEN_1816}",
+        "API_1816_URL": "https://api-service.1816.com.ar/v1",
+        "TOKEN_1816_URL": "https://auth.1816.com.ar/realms/milochorep/protocol/openid-connect/token",
+        "CLIENT_ID_1816": "user-console-prod"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "OMS MCP Server (stdio)",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/servers/oms/cmd",
+      "cwd": "${workspaceFolder}/servers/oms",
+      "env": {
+        "OMS_BASE_URL": "https://oms.cdfbox.com",
+        "OMS_IP": "52.184.149.124",
+        "OMS_USERNAME": "asng",
+        "OMS_PASSWORD": "nguan3579",
+        "OMS_DEFAULT_ADVISOR_ID": "136"
+      },
       "console": "integratedTerminal"
     },
     {
@@ -38,10 +70,37 @@
       "type": "go",
       "request": "launch",
       "mode": "debug",
-      "program": "${workspaceFolder}/allfunds/cmd",
+      "program": "${workspaceFolder}/servers/allfunds/cmd",
       "args": ["-mode=http", "-port=8081"],
-      "cwd": "${workspaceFolder}/allfunds",
+      "cwd": "${workspaceFolder}/servers/allfunds",
       "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "1816 MCP Server (HTTP/SSE) - Port 8082",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/servers/1816/cmd",
+      "args": ["-mode=http", "-port=8082"],
+      "cwd": "${workspaceFolder}/servers/1816",
+      "env": {
+        "API_1816_URL": "https://api-service.1816.com.ar/v1",
+        "TOKEN_1816_URL": "https://auth.1816.com.ar/realms/milochorep/protocol/openid-connect/token",
+        "CLIENT_ID_1816": "user-console-prod"
+      }
+    },
+    {
+      "name": "OMS MCP Server (HTTP/SSE) - Port 8083",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/servers/oms/cmd",
+      "args": ["-mode=http", "-port=8083"],
+      "cwd": "${workspaceFolder}/servers/oms",
+      "env": {
+        "OMS_BASE_URL": "https://oms.cdfbox.com",
+        "OMS_IP": "52.184.149.124"
+      }
     }
   ]
 }
