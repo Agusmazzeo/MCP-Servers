@@ -169,9 +169,18 @@ func (c *Client) Get(ctx context.Context, path string) (interface{}, error) {
 		return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, string(bodyBytes[:min(300, len(bodyBytes))]))
 	}
 
+	// Read response body for better error messages
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	log.Printf("[OMS] Response (%d bytes): %s", len(bodyBytes), string(bodyBytes[:min(500, len(bodyBytes))]))
+
 	var result interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response (got %d bytes, starts with: %s...): %w",
+			len(bodyBytes), string(bodyBytes[:min(100, len(bodyBytes))]), err)
 	}
 
 	return result, nil
@@ -246,10 +255,16 @@ func (c *Client) Post(ctx context.Context, path string, body interface{}) (inter
 		return map[string]interface{}{"status": "submitted"}, nil
 	}
 
+	log.Printf("[OMS] POST Response (%d bytes): %s", len(responseData), string(responseData[:min(500, len(responseData))]))
+
 	var result interface{}
 	if err := json.Unmarshal(responseData, &result); err != nil {
-		// If parsing fails, return raw text
-		return map[string]interface{}{"raw": string(responseData)}, nil
+		// If parsing fails, return raw text with better error
+		log.Printf("[OMS] Failed to parse JSON, returning raw response")
+		return map[string]interface{}{
+			"raw": string(responseData),
+			"error": fmt.Sprintf("JSON parse error: %v", err),
+		}, nil
 	}
 
 	return result, nil

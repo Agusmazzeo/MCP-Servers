@@ -4,15 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
+	"math"
 
-	"github.com/Agusmazzeo/allfunds-mcp/internal/client"
+	"github.com/Agusmazzeo/oms-mcp/internal/client"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// HandlerFactory creates tool handlers for Allfunds
+// HandlerFactory creates tool handlers for OMS
 type HandlerFactory struct {
 	client *client.Client
 }
@@ -26,44 +24,20 @@ func NewHandlerFactory(client *client.Client) *HandlerFactory {
 func (f *HandlerFactory) CreateHandler(toolName string) func(context.Context, *mcp.CallToolRequest, map[string]interface{}) (*mcp.CallToolResult, any, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
 		switch toolName {
-		case "search_funds":
-			return f.handleSearchFunds(ctx, args)
-		case "get_current_user":
-			return f.handleGetCurrentUser(ctx, args)
-		case "list_watchlists":
-			return f.handleListWatchlists(ctx, args)
-		case "get_pinned_watchlist":
-			return f.handleGetPinnedWatchlist(ctx, args)
-		case "get_fund_insights":
-			return f.handleGetFundInsights(ctx, args)
-		case "get_watchlist_funds":
-			return f.handleGetWatchlistFunds(ctx, args)
-		case "login_status":
-			return f.handleLoginStatus(ctx, args)
-		case "get_fund_detail":
-			return f.handleGetFundDetail(ctx, args)
-		case "get_fund_performance":
-			return f.handleGetFundPerformance(ctx, args)
-		case "get_fund_ratios":
-			return f.handleGetFundRatios(ctx, args)
-		case "get_fund_documents":
-			return f.handleGetFundDocuments(ctx, args)
-		case "get_fund_share_classes":
-			return f.handleGetFundShareClasses(ctx, args)
-		case "compare_funds_performance":
-			return f.handleCompareFundsPerformance(ctx, args)
-		case "get_fund_portfolio":
-			return f.handleGetFundPortfolio(ctx, args)
-		case "get_fund_nav_history":
-			return f.handleGetFundNAVHistory(ctx, args)
-		case "get_fund_nav_on_date":
-			return f.handleGetFundNAVOnDate(ctx, args)
-		case "get_fund_managers":
-			return f.handleGetFundManagers(ctx, args)
-		case "get_similar_funds":
-			return f.handleGetSimilarFunds(ctx, args)
-		case "download_document":
-			return f.handleDownloadDocument(ctx, args)
+		case "create_equity_order":
+			return f.handleCreateEquityOrder(ctx, args)
+		case "create_mutual_fund_order":
+			return f.handleCreateMutualFundOrder(ctx, args)
+		case "create_bond_order":
+			return f.handleCreateBondOrder(ctx, args)
+		case "get_brokers":
+			return f.handleGetBrokers(ctx, args)
+		case "get_advisors":
+			return f.handleGetAdvisors(ctx, args)
+		case "get_orders":
+			return f.handleGetOrders(ctx, args)
+		case "oms_login":
+			return f.handleOMSLogin(ctx, args)
 		default:
 			return &mcp.CallToolResult{
 				IsError: true,
@@ -75,252 +49,271 @@ func (f *HandlerFactory) CreateHandler(toolName string) func(context.Context, *m
 	}
 }
 
-// CreateLoginHandler creates the login tool handler
-func (f *HandlerFactory) CreateLoginHandler() func(context.Context, *mcp.CallToolRequest, map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	return func(ctx context.Context, req *mcp.CallToolRequest, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-		// Login is handled automatically by GraphQL client
-		if err := f.client.Login(ctx); err != nil {
-			return &mcp.CallToolResult{
-				IsError: true,
-				Content: []mcp.Content{
-					&mcp.TextContent{Text: fmt.Sprintf("Login failed: %v", err)},
-				},
-			}, nil, nil
-		}
+// handleCreateEquityOrder creates an equity (stock) order
+func (f *HandlerFactory) handleCreateEquityOrder(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
+	direction, _ := args["direction"].(string)
+	broker, _ := args["broker"].(string)
+	customerAccount, _ := args["customer_account"].(string)
+	symbol, _ := args["symbol"].(string)
+	quantity := getFloatOrDefault(args, "quantity", 0)
+	orderType := getStringOrDefault(args, "order_type", "market")
+	limitPrice := getFloatOrDefault(args, "limit_price", 0)
+	timeFrame := getStringOrDefault(args, "time_frame", "day")
+	commissionType := getStringOrDefault(args, "commission_type", "cash")
+	commissionValue := getFloatOrDefault(args, "commission_value", 0)
+	notionalUSD := getFloatOrDefault(args, "notional_usd", 0)
+	skipMinimum := getBoolOrDefault(args, "skip_minimum", false)
+	notes := getStringOrDefault(args, "notes", "")
 
+	// Determine notional for minimum fee check
+	if orderType == "limit" && limitPrice > 0 && notionalUSD == 0 {
+		notionalUSD = quantity * limitPrice
+	}
+
+	// If commission is in % and we don't know the notional, we can't validate the USD 100 minimum
+	finalCommType := commissionType
+	finalCommValue := commissionValue
+	if commissionType == "percentage" && notionalUSD == 0 {
 		return &mcp.CallToolResult{
+			IsError: true,
 			Content: []mcp.Content{
-				&mcp.TextContent{Text: "✓ Successfully authenticated with Allfunds Connect"},
+				&mcp.TextContent{Text: "⚠️ Para validar el mínimo de USD 100, necesito saber el monto aproximado total a operar. Por favor indicá el valor estimado de la operación en USD (parámetro notional_usd)."},
 			},
 		}, nil, nil
 	}
-}
 
-// handleSearchFunds searches for funds by name/ISIN/ticker
-func (f *HandlerFactory) handleSearchFunds(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	search, _ := args["search"].(string)
-	page := getIntOrDefault(args, "page", 1)
-	pageSize := getIntOrDefault(args, "page_size", 10)
-
-	criteria := map[string]interface{}{
-		"search": search,
+	// Enforce USD 100 minimum (unless skip_minimum=true)
+	if !skipMinimum {
+		if commissionType == "percentage" && notionalUSD > 0 {
+			feeUSD := (commissionValue / 100) * notionalUSD
+			if feeUSD < 100 {
+				finalCommType = "cash"
+				finalCommValue = 100
+			}
+		} else if commissionType == "cash" {
+			if commissionValue < 100 {
+				finalCommValue = 100
+			}
+		}
 	}
 
-	if avail, ok := args["available_in_allfunds"].(bool); ok && avail {
-		criteria["dealable_for_entity"] = true
+	order := map[string]interface{}{
+		"direction":        direction,
+		"broker":           broker,
+		"customer_account": customerAccount,
+		"symbol":           symbol,
+		"quantity":         quantity,
+		"order_type":       orderType,
+		"limit_price":      limitPrice,
+		"time_frame":       timeFrame,
+		"commission_type":  finalCommType,
+		"commission_value": finalCommValue,
+		"notes":            notes,
 	}
 
-	if currency, ok := args["currency"].(string); ok && currency != "" {
-		criteria["currency"] = currency
-	}
-
-	if sfdr, ok := args["sfdr_article"].(string); ok && sfdr != "" {
-		criteria["sfdr_article"] = sfdr
-	}
-
-	sortField := getStringOrDefault(args, "sort_field", "name")
-	sortDirection := getStringOrDefault(args, "sort_direction", "asc")
-
-	variables := map[string]interface{}{
-		"screeningCriteria": criteria,
-		"pagination": map[string]interface{}{
-			"page":      page,
-			"page_size": pageSize,
-		},
-		"order": map[string]interface{}{
-			"field":     sortField,
-			"direction": sortDirection,
-		},
-		"cache": true,
-	}
-
-	var result struct {
-		ProductScreener struct {
-			ScreenProducts struct {
-				Results          []map[string]interface{} `json:"results"`
-				PaginationResult struct {
-					TotalCount int `json:"total_count"`
-					PageCount  int `json:"page_count"`
-				} `json:"pagination_result"`
-			} `json:"screen_products"`
-		} `json:"product_screener"`
-	}
-
-	err := f.client.Query(ctx, "ScreenProducts", client.ScreenProductsQuery, variables, &result)
+	result, err := f.client.Post(ctx, "/api/crearEditarOrden", order)
 	if err != nil {
 		return errorResult(err)
 	}
 
-	return successResult(result.ProductScreener.ScreenProducts)
+	return successResult(result)
 }
 
-// handleGetCurrentUser gets current user information
-func (f *HandlerFactory) handleGetCurrentUser(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	var result struct {
-		Me map[string]interface{} `json:"me"`
+// handleCreateMutualFundOrder creates a mutual fund order
+func (f *HandlerFactory) handleCreateMutualFundOrder(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
+	direction, _ := args["direction"].(string)
+	broker, _ := args["broker"].(string)
+	customerAccount, _ := args["customer_account"].(string)
+	cusip, _ := args["cusip"].(string)
+	quantityType, _ := args["quantity_type"].(string)
+	quantity := getFloatOrDefault(args, "quantity", 0)
+	lastPrice := getFloatOrDefault(args, "last_price", 0)
+	fullLiquidation := getBoolOrDefault(args, "full_liquidation", false)
+	feePct := getFloatOrDefault(args, "fee_pct", 0)
+	commissionType := getStringOrDefault(args, "commission_type", "percentage")
+	feeInclusion := getStringOrDefault(args, "fee_inclusion", "added")
+	amountUSDForFee := getFloatOrDefault(args, "amount_usd_for_fee", 0)
+	skipMinimum := getBoolOrDefault(args, "skip_minimum", false)
+	notes := getStringOrDefault(args, "notes", "")
+	dividendType := getStringOrDefault(args, "dividend_type", "cash")
+	capitalType := getStringOrDefault(args, "capital_type", "cash")
+
+	// Parse numeric params
+	qty := quantity
+	lastPx := lastPrice
+
+	finalQuantity := qty
+	finalQuantityType := quantityType
+
+	// For sells, convert to shares if needed
+	if direction == "sell" {
+		finalQuantityType = "shares"
+		if quantityType == "dollars" {
+			if lastPx == 0 {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{
+						&mcp.TextContent{Text: "❌ For selling by USD amount, last_price (latest NAV) is required to convert to shares."},
+					},
+				}, nil, nil
+			}
+			finalQuantity = ceilTwoDecimals(qty / lastPx)
+		}
 	}
 
-	err := f.client.Query(ctx, "GetCurrentUser", client.GetCurrentUserQuery, nil, &result)
+	// Determine notional USD for fee calculation and minimum enforcement
+	var notionalUSD float64
+	if quantityType == "dollars" {
+		notionalUSD = qty
+	} else if amountUSDForFee > 0 {
+		notionalUSD = amountUSDForFee
+	}
+
+	// Resolve commission value
+	var finalCommValue float64
+
+	if commissionType == "percentage" {
+		if notionalUSD == 0 {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{
+					&mcp.TextContent{Text: "❌ amount_usd_for_fee es requerido cuando quantity_type=shares y commission_type=percentage, para poder validar el mínimo de USD 100."},
+				},
+			}, nil, nil
+		}
+		feeUSD := (feePct / 100) * notionalUSD
+		if direction == "sell" {
+			// MF SELLS: ALWAYS store as USD (never as %)
+			if !skipMinimum && feeUSD < 100 {
+				finalCommValue = 100
+			} else {
+				finalCommValue = feeUSD
+			}
+		} else {
+			// MF BUYS: store raw % as-is if fee >= 100, otherwise USD 100 minimum
+			if !skipMinimum && feeUSD < 100 {
+				finalCommValue = 100
+			} else {
+				finalCommValue = feePct
+			}
+		}
+	} else {
+		// cash: store USD amount with minimum
+		if !skipMinimum && feePct < 100 {
+			finalCommValue = 100
+		} else {
+			finalCommValue = feePct
+		}
+	}
+
+	order := map[string]interface{}{
+		"direction":         direction,
+		"broker":            broker,
+		"customer_account":  customerAccount,
+		"cusip":             cusip,
+		"quantity_type":     finalQuantityType,
+		"quantity":          finalQuantity,
+		"full_liquidation":  fullLiquidation,
+		"fee_inclusion":     feeInclusion,
+		"commission_value":  finalCommValue,
+		"notes":             notes,
+		"dividend_type":     dividendType,
+		"capital_type":      capitalType,
+	}
+
+	result, err := f.client.Post(ctx, "/api/crearEditarOrden", order)
 	if err != nil {
 		return errorResult(err)
 	}
 
-	return successResult(result.Me)
+	return successResult(result)
 }
 
-// handleListWatchlists lists user's watchlists
-func (f *HandlerFactory) handleListWatchlists(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	page := getIntOrDefault(args, "page", 1)
-	pageSize := getIntOrDefault(args, "page_size", 20)
+// handleCreateBondOrder creates a bond order
+func (f *HandlerFactory) handleCreateBondOrder(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
+	direction, _ := args["direction"].(string)
+	broker, _ := args["broker"].(string)
+	customerAccount, _ := args["customer_account"].(string)
+	isin, _ := args["isin"].(string)
+	quantity := getFloatOrDefault(args, "quantity", 0)
+	price := getFloatOrDefault(args, "price", 0)
+	markupPct := getFloatOrDefault(args, "markup_pct", 0)
+	skipMinimum := getBoolOrDefault(args, "skip_minimum", false)
+	notes := getStringOrDefault(args, "notes", "")
 
-	variables := map[string]interface{}{
-		"pagination": map[string]interface{}{
-			"page":      page,
-			"page_size": pageSize,
-		},
-		"order": map[string]interface{}{
-			"field":     "name",
-			"direction": "asc",
-		},
+	// Notional = face value × (price / 100) — bonds quoted as % of par
+	notionalUSD := quantity * (price / 100)
+	feeUSD := (markupPct / 100) * notionalUSD
+
+	// Enforce USD 100 minimum:
+	// If markup% yields < USD 100, zero out markup and use flat commission = 100
+	finalMarkupPct := markupPct
+	flatCommission := 0.0
+	minimumApplied := !skipMinimum && feeUSD < 100
+	if minimumApplied {
+		finalMarkupPct = 0
+		flatCommission = 100
 	}
 
-	var result struct {
-		WatchlistsPaginated struct {
-			Results []map[string]interface{} `json:"results"`
-		} `json:"watchlists_paginated"`
+	order := map[string]interface{}{
+		"direction":        direction,
+		"broker":           broker,
+		"customer_account": customerAccount,
+		"isin":             isin,
+		"quantity":         quantity,
+		"price":            price,
+		"markup_pct":       finalMarkupPct,
+		"flat_commission":  flatCommission,
+		"notes":            notes,
 	}
 
-	err := f.client.Query(ctx, "GetWatchlistsPaginated", client.GetWatchlistsQuery, variables, &result)
+	result, err := f.client.Post(ctx, "/api/crearEditarOrden", order)
 	if err != nil {
 		return errorResult(err)
 	}
 
-	return successResult(result.WatchlistsPaginated.Results)
+	return successResult(result)
 }
 
-// handleGetPinnedWatchlist gets user's pinned watchlist
-func (f *HandlerFactory) handleGetPinnedWatchlist(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	var result struct {
-		PinnedWatchlist []map[string]interface{} `json:"pinned_watchlist"`
-	}
-
-	err := f.client.Query(ctx, "GetPinnedWatchlist", client.GetPinnedWatchlistQuery, nil, &result)
+// handleGetBrokers gets list of available brokers
+func (f *HandlerFactory) handleGetBrokers(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
+	result, err := f.client.Get(ctx, "/api/getBrokers")
 	if err != nil {
 		return errorResult(err)
 	}
 
-	return successResult(result.PinnedWatchlist)
+	return successResult(result)
 }
 
-// handleGetFundInsights gets fund insights/articles
-func (f *HandlerFactory) handleGetFundInsights(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	page := getIntOrDefault(args, "page", 1)
-	pageSize := getIntOrDefault(args, "page_size", 10)
-
-	criteria := map[string]interface{}{}
-
-	// Note: ArticleCriteriaInput doesn't support text search
-	// Only hashtags and regions are supported
-
-	if hashtags, ok := args["hashtags"].([]interface{}); ok && len(hashtags) > 0 {
-		criteria["hashtags"] = hashtags
-	}
-
-	if regions, ok := args["regions"].([]interface{}); ok && len(regions) > 0 {
-		criteria["regions"] = regions
-	}
-
-	variables := map[string]interface{}{
-		"pagination": map[string]interface{}{
-			"page":      page,
-			"page_size": pageSize,
-		},
-		"order": map[string]interface{}{
-			"field":     "publish_date",
-			"direction": "desc",
-		},
-		"include_sponsored": false,
-	}
-
-	if len(criteria) > 0 {
-		variables["criteria"] = criteria
-	}
-
-	var result struct {
-		Articles struct {
-			Results []map[string]interface{} `json:"results"`
-		} `json:"articles"`
-	}
-
-	err := f.client.Query(ctx, "GetArticles", client.GetArticlesQuery, variables, &result)
+// handleGetAdvisors gets list of advisors
+func (f *HandlerFactory) handleGetAdvisors(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
+	result, err := f.client.Get(ctx, "/api/getAsesores")
 	if err != nil {
 		return errorResult(err)
 	}
 
-	return successResult(result.Articles.Results)
+	return successResult(result)
 }
 
-// handleGetWatchlistFunds gets funds from a watchlist
-func (f *HandlerFactory) handleGetWatchlistFunds(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	watchlistID, _ := args["watchlist_id"].(string)
-	page := getIntOrDefault(args, "page", 1)
-	pageSize := getIntOrDefault(args, "page_size", 25)
-	search := getStringOrDefault(args, "search", "")
+// handleGetOrders gets list of orders
+func (f *HandlerFactory) handleGetOrders(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
+	advisorID := int(getFloatOrDefault(args, "advisor_id", 136))
 
-	variables := map[string]interface{}{
-		"id": watchlistID,
-		"pagination": map[string]interface{}{
-			"page":      page,
-			"page_size": pageSize,
-		},
-		"order": map[string]interface{}{
-			"field":     "name",
-			"direction": "asc",
-		},
-	}
+	path := fmt.Sprintf("/api/getAdvisorOrders?advisorId=%d", advisorID)
 
-	if search != "" {
-		variables["search_string"] = search
-	}
-
-	var result struct {
-		Watchlist struct {
-			ID            string `json:"id"`
-			Name          string `json:"name"`
-			TotalProducts int    `json:"total_products"`
-			PaginatedProducts struct {
-				Results []map[string]interface{} `json:"results"`
-				PaginationResult struct {
-					TotalCount int `json:"total_count"`
-					PageCount  int `json:"page_count"`
-				} `json:"pagination_result"`
-			} `json:"paginated_products"`
-		} `json:"watchlist"`
-	}
-
-	err := f.client.Query(ctx, "GetProductsFromWatchlist", client.GetWatchlistFundsQuery, variables, &result)
+	result, err := f.client.Get(ctx, path)
 	if err != nil {
 		return errorResult(err)
 	}
 
-	// Return watchlist info with paginated results
-	response := map[string]interface{}{
-		"id":            result.Watchlist.ID,
-		"name":          result.Watchlist.Name,
-		"total_products": result.Watchlist.TotalProducts,
-		"results":       result.Watchlist.PaginatedProducts.Results,
-		"page_count":    result.Watchlist.PaginatedProducts.PaginationResult.PageCount,
-		"total_count":   result.Watchlist.PaginatedProducts.PaginationResult.TotalCount,
-	}
-
-	return successResult(response)
+	return successResult(result)
 }
 
-// handleLoginStatus checks authentication status
-func (f *HandlerFactory) handleLoginStatus(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	// Try to re-login to verify session
+// handleOMSLogin checks OMS login status
+func (f *HandlerFactory) handleOMSLogin(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
 	if err := f.client.Login(ctx); err != nil {
 		return &mcp.CallToolResult{
+			IsError: true,
 			Content: []mcp.Content{
 				&mcp.TextContent{Text: fmt.Sprintf("❌ Not authenticated: %v", err)},
 			},
@@ -329,525 +322,19 @@ func (f *HandlerFactory) handleLoginStatus(ctx context.Context, args map[string]
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: "✅ Authenticated with Allfunds Connect"},
+			&mcp.TextContent{Text: "✅ Authenticated with OMS"},
 		},
 	}, nil, nil
 }
 
-// handleGetFundDetail gets detailed fund information
-func (f *HandlerFactory) handleGetFundDetail(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	isin, _ := args["isin"].(string)
-
-	// First get internal ID from ISIN
-	internalID, err := f.getInternalIDFromISIN(ctx, isin)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	variables := map[string]interface{}{
-		"id": internalID,
-	}
-
-	var result struct {
-		Product map[string]interface{} `json:"product"`
-	}
-
-	err = f.client.Query(ctx, "GetProduct", client.GetProductQuery, variables, &result)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	return successResult(result.Product)
-}
-
-// handleGetFundPerformance gets fund performance data
-func (f *HandlerFactory) handleGetFundPerformance(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	isin, _ := args["isin"].(string)
-
-	internalID, err := f.getInternalIDFromISIN(ctx, isin)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	variables := map[string]interface{}{
-		"id": internalID,
-	}
-
-	var result struct {
-		Product struct {
-			ISIN                 string                 `json:"isin"`
-			Name                 string                 `json:"name"`
-			PerformanceByPeriods map[string]interface{} `json:"performance_by_periods"`
-		} `json:"product"`
-	}
-
-	err = f.client.Query(ctx, "GetProduct", client.GetProductQuery, variables, &result)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	return successResult(result.Product)
-}
-
-// handleGetFundRatios gets fund risk/return ratios
-func (f *HandlerFactory) handleGetFundRatios(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	isin, _ := args["isin"].(string)
-	period := getStringOrDefault(args, "period", "all")
-
-	internalID, err := f.getInternalIDFromISIN(ctx, isin)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	variables := map[string]interface{}{
-		"id": internalID,
-	}
-
-	var result struct {
-		Product struct {
-			ISIN             string                 `json:"isin"`
-			Name             string                 `json:"name"`
-			CalculatedRatios map[string]interface{} `json:"calculated_ratios"`
-		} `json:"product"`
-	}
-
-	err = f.client.Query(ctx, "GetProduct", client.GetProductQuery, variables, &result)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	// Filter by period if not "all"
-	if period != "all" {
-		ratios := result.Product.CalculatedRatios
-		filtered := map[string]interface{}{
-			period: ratios[period],
-		}
-		result.Product.CalculatedRatios = filtered
-	}
-
-	return successResult(result.Product)
-}
-
-// handleGetFundDocuments gets fund documents
-func (f *HandlerFactory) handleGetFundDocuments(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	isin, _ := args["isin"].(string)
-	pageSize := getIntOrDefault(args, "page_size", 50)
-
-	internalID, err := f.getInternalIDFromISIN(ctx, isin)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	variables := map[string]interface{}{
-		"id": internalID,
-		"pagination": map[string]interface{}{
-			"page":      1,
-			"page_size": pageSize,
-		},
-	}
-
-	var result struct {
-		Product struct {
-			ISIN      string `json:"isin"`
-			Name      string `json:"name"`
-			Documents struct {
-				Results []map[string]interface{} `json:"results"`
-			} `json:"documents"`
-		} `json:"product"`
-	}
-
-	err = f.client.Query(ctx, "GetProductDocuments", client.GetProductDocumentsQuery, variables, &result)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	return successResult(result.Product)
-}
-
-// handleGetFundShareClasses gets fund share classes
-func (f *HandlerFactory) handleGetFundShareClasses(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	isin, _ := args["isin"].(string)
-
-	internalID, err := f.getInternalIDFromISIN(ctx, isin)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	variables := map[string]interface{}{
-		"id": internalID,
-	}
-
-	var result struct {
-		Product struct {
-			ISIN         string                   `json:"isin"`
-			Name         string                   `json:"name"`
-			ShareClasses []map[string]interface{} `json:"share_classes"`
-		} `json:"product"`
-	}
-
-	err = f.client.Query(ctx, "GetProduct", client.GetProductQuery, variables, &result)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	return successResult(result.Product)
-}
-
-// handleCompareFundsPerformance compares performance of multiple funds
-func (f *HandlerFactory) handleCompareFundsPerformance(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	isinsInterface, ok := args["isins"].([]interface{})
-	if !ok {
-		return errorResult(fmt.Errorf("isins must be an array"))
-	}
-
-	var isins []string
-	for _, isinInterface := range isinsInterface {
-		if isin, ok := isinInterface.(string); ok {
-			isins = append(isins, isin)
-		}
-	}
-
-	comparison := make([]map[string]interface{}, 0, len(isins))
-
-	for _, isin := range isins {
-		internalID, err := f.getInternalIDFromISIN(ctx, isin)
-		if err != nil {
-			continue // Skip funds that fail
-		}
-
-		variables := map[string]interface{}{
-			"id": internalID,
-		}
-
-		var result struct {
-			Product map[string]interface{} `json:"product"`
-		}
-
-		err = f.client.Query(ctx, "GetProduct", client.GetProductQuery, variables, &result)
-		if err != nil {
-			continue
-		}
-
-		comparison = append(comparison, result.Product)
-	}
-
-	return successResult(comparison)
-}
-
-// handleGetFundPortfolio gets fund portfolio breakdown
-func (f *HandlerFactory) handleGetFundPortfolio(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	isin, _ := args["isin"].(string)
-	topSize := getIntOrDefault(args, "top_size", 10)
-
-	internalID, err := f.getInternalIDFromISIN(ctx, isin)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	variables := map[string]interface{}{
-		"id":       internalID,
-		"top_size": topSize,
-		"limited":  false,
-	}
-
-	var result struct {
-		Product map[string]interface{} `json:"product"`
-	}
-
-	err = f.client.Query(ctx, "ProductCalculations", client.ProductCalculationsQuery, variables, &result)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	return successResult(result.Product)
-}
-
-// Placeholder handlers for tools that need additional GraphQL queries
-func (f *HandlerFactory) handleGetFundNAVHistory(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	isin, _ := args["isin"].(string)
-	sinceDate := getStringOrDefault(args, "since_date", "")
-	untilDate := getStringOrDefault(args, "until_date", "")
-	limit := getIntOrDefault(args, "limit", 252)
-
-	internalID, err := f.getInternalIDFromISIN(ctx, isin)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	variables := map[string]interface{}{
-		"id":    internalID,
-		"limit": limit,
-	}
-	if sinceDate != "" {
-		variables["since_date"] = sinceDate
-	}
-	if untilDate != "" {
-		variables["until_date"] = untilDate
-	}
-
-	var result struct {
-		Product struct {
-			ISIN        string `json:"isin"`
-			Name        string `json:"name"`
-			ClosePrices []struct {
-				Date  string  `json:"date"`
-				Value float64 `json:"value"`
-			} `json:"close_prices"`
-			Dividends []struct {
-				DividendAt string  `json:"dividend_at"`
-				RecordedAt string  `json:"recorded_at"`
-				PayedAt    string  `json:"payed_at"`
-				Unit       float64 `json:"unit"`
-			} `json:"dividends"`
-			Splits []struct {
-				SplitAt string  `json:"split_at"`
-				Ratio   float64 `json:"ratio"`
-			} `json:"splits"`
-		} `json:"product"`
-	}
-
-	err = f.client.Query(ctx, "ProductPrices", client.ProductPricesQuery, variables, &result)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	response := map[string]interface{}{
-		"nombre":         result.Product.Name,
-		"isin":           result.Product.ISIN,
-		"total_precios":  len(result.Product.ClosePrices),
-		"precios":        result.Product.ClosePrices,
-		"dividendos":     result.Product.Dividends,
-		"splits":         result.Product.Splits,
-	}
-
-	return successResult(response)
-}
-
-func (f *HandlerFactory) handleGetFundNAVOnDate(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	isin, _ := args["isin"].(string)
-	dateStr, _ := args["date"].(string)
-
-	internalID, err := f.getInternalIDFromISIN(ctx, isin)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	// Request prices in a window of ±7 days around the target date
-	variables := map[string]interface{}{
-		"id":    internalID,
-		"limit": 15,
-	}
-
-	// Parse target date and create window
-	if dateStr != "" {
-		// Simple date window calculation (7 days before, 1 day after)
-		variables["since_date"] = dateStr // Simplified - ideally calculate 7 days before
-		variables["until_date"] = dateStr
-	}
-
-	var result struct {
-		Product struct {
-			ISIN        string `json:"isin"`
-			Name        string `json:"name"`
-			ClosePrices []struct {
-				Date  string  `json:"date"`
-				Value float64 `json:"value"`
-			} `json:"close_prices"`
-		} `json:"product"`
-	}
-
-	err = f.client.Query(ctx, "ProductPrices", client.ProductPricesQuery, variables, &result)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	response := map[string]interface{}{
-		"nombre":            result.Product.Name,
-		"isin":              result.Product.ISIN,
-		"fecha_solicitada":  dateStr,
-	}
-
-	// Find exact or closest price
-	if len(result.Product.ClosePrices) > 0 {
-		// Look for exact match first
-		var closestPrice *struct {
-			Date  string  `json:"date"`
-			Value float64 `json:"value"`
-		}
-		for i := range result.Product.ClosePrices {
-			if result.Product.ClosePrices[i].Date == dateStr {
-				closestPrice = &result.Product.ClosePrices[i]
-				response["precio_exacto"] = true
-				break
-			}
-		}
-		// If no exact match, use first available (closest)
-		if closestPrice == nil && len(result.Product.ClosePrices) > 0 {
-			closestPrice = &result.Product.ClosePrices[0]
-			response["precio_exacto"] = false
-		}
-
-		if closestPrice != nil {
-			response["fecha_real"] = closestPrice.Date
-			response["nav"] = closestPrice.Value
-		}
-	} else {
-		response["nav"] = nil
-		response["_nota"] = "No se encontraron precios para esa fecha"
-	}
-
-	return successResult(response)
-}
-
-func (f *HandlerFactory) handleGetFundManagers(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	isin, _ := args["isin"].(string)
-
-	internalID, err := f.getInternalIDFromISIN(ctx, isin)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	variables := map[string]interface{}{
-		"id": internalID,
-	}
-
-	var result struct {
-		Product struct {
-			ISIN     string                   `json:"isin"`
-			Name     string                   `json:"name"`
-			Managers []map[string]interface{} `json:"managers"`
-		} `json:"product"`
-	}
-
-	err = f.client.Query(ctx, "GetProduct", client.GetProductQuery, variables, &result)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	return successResult(result.Product)
-}
-
-func (f *HandlerFactory) handleGetSimilarFunds(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	isin, _ := args["isin"].(string)
-
-	internalID, err := f.getInternalIDFromISIN(ctx, isin)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	variables := map[string]interface{}{
-		"product_id": internalID,
-	}
-
-	var result struct {
-		GetSimilarAlternativesForProduct []map[string]interface{} `json:"get_similar_alternatives_for_product"`
-	}
-
-	err = f.client.Query(ctx, "GetSimilarAlternativesForProductQuery", client.GetSimilarFundsQuery, variables, &result)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	response := map[string]interface{}{
-		"isin_referencia":   isin,
-		"total_similares":   len(result.GetSimilarAlternativesForProduct),
-		"fondos_similares":  result.GetSimilarAlternativesForProduct,
-	}
-
-	return successResult(response)
-}
-
-func (f *HandlerFactory) handleDownloadDocument(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
-	url, _ := args["url"].(string)
-
-	if url == "" {
-		return errorResult(fmt.Errorf("url parameter is required"))
-	}
-
-	// Download document using authenticated session
-	content, err := f.client.DownloadFile(ctx, url)
-	if err != nil {
-		return errorResult(err)
-	}
-
-	// Extract filename from URL
-	parts := strings.Split(url, "/")
-	filename := parts[len(parts)-1]
-	if filename == "" {
-		filename = "document.pdf"
-	}
-
-	// Create temp directory for documents
-	tempDir := filepath.Join(os.TempDir(), "allfunds_docs")
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
-		return errorResult(fmt.Errorf("failed to create temp directory: %w", err))
-	}
-
-	// Save file
-	filepath := filepath.Join(tempDir, filename)
-	if err := os.WriteFile(filepath, content, 0644); err != nil {
-		return errorResult(fmt.Errorf("failed to save file: %w", err))
-	}
-
-	response := map[string]interface{}{
-		"status":     "ok",
-		"filename":   filename,
-		"path":       filepath,
-		"size_bytes": len(content),
-		"url":        url,
-	}
-
-	return successResult(response)
-}
-
-// Helper: Get internal ID from ISIN
-func (f *HandlerFactory) getInternalIDFromISIN(ctx context.Context, isin string) (string, error) {
-	variables := map[string]interface{}{
-		"screeningCriteria": map[string]interface{}{
-			"search": isin,
-		},
-		"pagination": map[string]interface{}{
-			"page":      1,
-			"page_size": 1,
-		},
-		"order": map[string]interface{}{
-			"field":     "name",
-			"direction": "asc",
-		},
-		"cache": true,
-	}
-
-	var result struct {
-		ProductScreener struct {
-			ScreenProducts struct {
-				Results []struct {
-					ID   string `json:"id"`
-					ISIN string `json:"isin"`
-				} `json:"results"`
-			} `json:"screen_products"`
-		} `json:"product_screener"`
-	}
-
-	err := f.client.Query(ctx, "ScreenProducts", client.ScreenProductsQuery, variables, &result)
-	if err != nil {
-		return "", err
-	}
-
-	if len(result.ProductScreener.ScreenProducts.Results) == 0 {
-		return "", fmt.Errorf("fund not found with ISIN: %s", isin)
-	}
-
-	return result.ProductScreener.ScreenProducts.Results[0].ID, nil
-}
-
 // Helper functions
-func getIntOrDefault(args map[string]interface{}, key string, defaultVal int) int {
+func getFloatOrDefault(args map[string]interface{}, key string, defaultVal float64) float64 {
 	if val, ok := args[key]; ok {
 		if floatVal, ok := val.(float64); ok {
-			return int(floatVal)
+			return floatVal
 		}
 		if intVal, ok := val.(int); ok {
-			return intVal
+			return float64(intVal)
 		}
 	}
 	return defaultVal
@@ -858,6 +345,17 @@ func getStringOrDefault(args map[string]interface{}, key string, defaultVal stri
 		return val
 	}
 	return defaultVal
+}
+
+func getBoolOrDefault(args map[string]interface{}, key string, defaultVal bool) bool {
+	if val, ok := args[key].(bool); ok {
+		return val
+	}
+	return defaultVal
+}
+
+func ceilTwoDecimals(n float64) float64 {
+	return math.Ceil(n*100) / 100
 }
 
 func successResult(data interface{}) (*mcp.CallToolResult, any, error) {

@@ -33,7 +33,7 @@ type Server struct {
 	baseURL      string
 	omsIP        string
 	oauthManager *transport.OAuthManager
-	toolDefs     []*tools.ToolDefinition
+	toolDefs     []tools.ToolDefinition
 }
 
 // NewServer creates a new MCP server
@@ -53,13 +53,13 @@ func NewServer(config *ServerConfig, baseURL, omsIP string) *Server {
 }
 
 // RegisterTools registers tools with the server
-func (s *Server) RegisterTools(factory tools.HandlerFactory, toolDefs []*tools.ToolDefinition, includeLogin bool) {
+func (s *Server) RegisterTools(factory *handlers.HandlerFactory, toolDefs []tools.ToolDefinition, includeLogin bool) {
 	s.toolDefs = toolDefs
 	tools.RegisterTools(s.mcp, factory, toolDefs, includeLogin)
 }
 
 // SetToolDefinitions sets tool definitions without registering them (for HTTP mode)
-func (s *Server) SetToolDefinitions(toolDefs []*tools.ToolDefinition) {
+func (s *Server) SetToolDefinitions(toolDefs []tools.ToolDefinition) {
 	s.toolDefs = toolDefs
 }
 
@@ -412,9 +412,9 @@ func (s *Server) handleToolCall(message map[string]interface{}, allfundsClient *
 
 	// Find tool definition
 	var toolDef *tools.ToolDefinition
-	for _, td := range s.toolDefs {
-		if td.Name == toolName {
-			toolDef = td
+	for i := range s.toolDefs {
+		if s.toolDefs[i].Name == toolName {
+			toolDef = &s.toolDefs[i]
 			break
 		}
 	}

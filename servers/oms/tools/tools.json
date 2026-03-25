@@ -1,137 +1,211 @@
 [
   {
     "name": "create_equity_order",
-    "description": "Create an equity (stock) order in OMS",
+    "description": "Create a buy or sell order for an equity (stock/ETF) in the Criteria OMS. Returns the created order ID.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "isBuy": {
-          "type": "boolean",
-          "description": "True for buy order, false for sell order"
+        "direction": {
+          "type": "string",
+          "enum": ["buy", "sell"],
+          "description": "Buy or sell"
         },
         "broker": {
           "type": "string",
-          "description": "Broker name (pershing/xp, criteria.uy/cuy, stonex/intl_fcs)"
+          "description": "Broker platform: 'pershing' or 'xp' for XP accounts, 'criteria.uy' or 'cuy' for CUY accounts, 'intl_fcs' or 'stonex' for StoneX accounts"
         },
-        "customer": {
+        "customer_account": {
           "type": "string",
-          "description": "Customer account number"
+          "description": "Client account number (from CRM, same value goes in Customer and Account fields)"
         },
         "symbol": {
           "type": "string",
-          "description": "Stock ticker symbol"
+          "description": "Ticker symbol, e.g. SPY, AAPL, GLD"
         },
         "quantity": {
           "type": "number",
-          "description": "Number of shares"
+          "description": "Number of shares or dollar amount"
         },
-        "price": {
-          "type": "number",
-          "description": "Price per share (optional for market orders)"
-        },
-        "orderType": {
+        "order_type": {
           "type": "string",
-          "description": "Order type: 'market' or 'limit' (default: 'market')",
-          "enum": ["market", "limit"]
+          "enum": ["market", "limit"],
+          "description": "Order type: market (default) or limit",
+          "default": "market"
         },
-        "commission": {
+        "limit_price": {
           "type": "number",
-          "description": "Commission amount (optional, defaults to $100 minimum)"
+          "description": "Limit price (only if order_type is limit)"
         },
-        "commissionType": {
+        "time_frame": {
           "type": "string",
-          "description": "Commission type: 'cash' or 'percentage' (default: 'cash')",
-          "enum": ["cash", "percentage"]
+          "enum": ["day", "gtc", "gtd"],
+          "description": "Time frame: day (default), gtc, or gtd",
+          "default": "day"
+        },
+        "commission_type": {
+          "type": "string",
+          "enum": ["cash", "percentage"],
+          "description": "Commission type: 'cash' for fixed USD amount, 'percentage' for % of notional value",
+          "default": "cash"
+        },
+        "commission_value": {
+          "type": "number",
+          "description": "Commission amount: USD if commission_type=cash, or percentage like 0.5 for 0.5% if commission_type=percentage"
+        },
+        "notional_usd": {
+          "type": "number",
+          "description": "Estimated notional value in USD — required for market orders with percentage commission so the USD 100 minimum can be enforced"
+        },
+        "skip_minimum": {
+          "type": "boolean",
+          "description": "Set to true ONLY when explicitly told not to apply the USD 100 minimum commission. Default is false (minimum always applies).",
+          "default": false
+        },
+        "notes": {
+          "type": "string",
+          "description": "Full asset name to put in the Notes field, e.g. 'SPDR S&P 500 ETF Trust'"
         }
       },
-      "required": ["isBuy", "broker", "customer", "symbol", "quantity"]
+      "required": ["direction", "broker", "customer_account", "symbol", "quantity", "commission_value"]
     }
   },
   {
     "name": "create_mutual_fund_order",
-    "description": "Create a mutual fund order in OMS",
+    "description": "Create a buy or sell order for a mutual fund in the Criteria OMS. For sells, quantity can be provided as shares or converted from USD amount. Commission minimum is USD 100.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "isBuy": {
-          "type": "boolean",
-          "description": "True for buy/subscription, false for sell/redemption"
+        "direction": {
+          "type": "string",
+          "enum": ["buy", "sell"],
+          "description": "Buy or sell"
         },
         "broker": {
           "type": "string",
-          "description": "Broker name (pershing/xp, criteria.uy/cuy, stonex/intl_fcs)"
+          "description": "Broker platform: 'pershing'/'xp', 'criteria.uy'/'cuy', or 'intl_fcs'/'stonex'"
         },
-        "customer": {
+        "customer_account": {
           "type": "string",
-          "description": "Customer account number"
+          "description": "Client account number from CRM"
         },
-        "fundName": {
+        "cusip": {
           "type": "string",
-          "description": "Mutual fund name or ISIN"
+          "description": "CUSIP or ISIN of the mutual fund"
         },
-        "amount": {
-          "type": "number",
-          "description": "Investment amount (for buy) or shares (for sell)"
-        },
-        "commission": {
-          "type": "number",
-          "description": "Commission amount (optional, defaults to $100 minimum)"
-        },
-        "commissionType": {
+        "quantity_type": {
           "type": "string",
-          "description": "Commission type: 'cash' or 'percentage' (default: 'percentage' for buy, 'cash' for sell)",
-          "enum": ["cash", "percentage"]
+          "enum": ["dollars", "shares"],
+          "description": "For buys: 'dollars' if providing USD amount, 'shares' if providing units. For sells: always 'shares'."
+        },
+        "quantity": {
+          "type": ["number", "string"],
+          "description": "Amount in USD (if quantity_type=dollars) or number of shares/units"
+        },
+        "last_price": {
+          "type": ["number", "string"],
+          "description": "Latest NAV price per share — required when selling by USD amount so shares can be calculated (shares = amount / last_price, rounded UP to 2 decimals)"
+        },
+        "full_liquidation": {
+          "type": "boolean",
+          "description": "Set to true when selling ALL shares of this fund (full liquidation). Do NOT set for partial sells.",
+          "default": false
+        },
+        "fee_pct": {
+          "type": ["number", "string"],
+          "description": "Commission: percentage (e.g. 0.75 for 0.75%) or fixed USD amount if commission_type=cash. Minimum USD 100 enforced automatically."
+        },
+        "commission_type": {
+          "type": "string",
+          "enum": ["percentage", "cash"],
+          "description": "'percentage' = fee_pct is a %, 'cash' = fee_pct is a fixed USD amount",
+          "default": "percentage"
+        },
+        "fee_inclusion": {
+          "type": "string",
+          "enum": ["added", "included"],
+          "description": "'added' = fee added ON TOP of amount (default), 'included' = fee included within the amount",
+          "default": "added"
+        },
+        "amount_usd_for_fee": {
+          "type": ["number", "string"],
+          "description": "USD notional to calculate fee from when quantity_type=shares. Also used for minimum enforcement."
+        },
+        "skip_minimum": {
+          "type": "boolean",
+          "description": "Set to true ONLY when explicitly told not to apply the USD 100 minimum. Default is false.",
+          "default": false
+        },
+        "notes": {
+          "type": "string",
+          "description": "Full fund name for the Notes field"
+        },
+        "dividend_type": {
+          "type": "string",
+          "enum": ["cash", "reinvest"],
+          "description": "Dividend type: 'cash' (default) or 'reinvest'",
+          "default": "cash"
+        },
+        "capital_type": {
+          "type": "string",
+          "enum": ["cash", "reinvest"],
+          "description": "Capital gains type: 'cash' (default) or 'reinvest'",
+          "default": "cash"
         }
       },
-      "required": ["isBuy", "broker", "customer", "fundName", "amount"]
+      "required": ["direction", "broker", "customer_account", "cusip", "quantity_type", "quantity", "fee_pct"]
     }
   },
   {
     "name": "create_bond_order",
-    "description": "Create a bond order in OMS",
+    "description": "Create a buy or sell order for a bond in the Criteria OMS. Uses % Principal markup type.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "isBuy": {
-          "type": "boolean",
-          "description": "True for buy order, false for sell order"
+        "direction": {
+          "type": "string",
+          "enum": ["buy", "sell"],
+          "description": "Buy or sell"
         },
         "broker": {
           "type": "string",
-          "description": "Broker name (pershing/xp, criteria.uy/cuy, stonex/intl_fcs)"
+          "description": "Broker platform: 'pershing'/'xp', 'criteria.uy'/'cuy', or 'intl_fcs'/'stonex'"
         },
-        "customer": {
+        "customer_account": {
           "type": "string",
-          "description": "Customer account number"
+          "description": "Client account number from CRM"
         },
         "isin": {
           "type": "string",
-          "description": "Bond ISIN code"
+          "description": "ISIN of the bond"
         },
-        "nominal": {
-          "type": "number",
-          "description": "Nominal amount"
+        "quantity": {
+          "type": ["number", "string"],
+          "description": "Face value / nominal amount (VN)"
         },
         "price": {
-          "type": "number",
-          "description": "Bond price (as percentage of par)"
+          "type": ["number", "string"],
+          "description": "Price of the bond"
         },
-        "commission": {
-          "type": "number",
-          "description": "Commission (optional, defaults to $100 flat)"
+        "markup_pct": {
+          "type": ["number", "string"],
+          "description": "Markup/commission percentage. Uses % Principal (on traded value). Minimum USD 100 equivalent enforced."
         },
-        "commissionType": {
+        "skip_minimum": {
+          "type": "boolean",
+          "description": "Set to true ONLY when explicitly told not to apply the USD 100 minimum. Default is false.",
+          "default": false
+        },
+        "notes": {
           "type": "string",
-          "description": "Commission type: 'principal' (% of principal) or 'cash' (flat $100)",
-          "enum": ["principal", "cash"]
+          "description": "Full bond name/description for the Notes field"
         }
       },
-      "required": ["isBuy", "broker", "customer", "isin", "nominal", "price"]
+      "required": ["direction", "broker", "customer_account", "isin", "quantity", "price", "markup_pct"]
     }
   },
   {
     "name": "get_brokers",
-    "description": "Get list of available brokers in OMS",
+    "description": "Get the list of available brokers from the OMS",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -140,7 +214,7 @@
   },
   {
     "name": "get_advisors",
-    "description": "Get list of advisors in OMS",
+    "description": "Get the list of available advisors from the OMS",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -149,21 +223,14 @@
   },
   {
     "name": "get_orders",
-    "description": "Get list of orders from OMS",
+    "description": "Get current orders list from the OMS for the default advisor (asng)",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "customer": {
-          "type": "string",
-          "description": "Filter by customer account number (optional)"
-        },
-        "status": {
-          "type": "string",
-          "description": "Filter by order status (optional)"
-        },
-        "limit": {
+        "advisor_id": {
           "type": "number",
-          "description": "Maximum number of orders to return (default: 50)"
+          "description": "Advisor ID (default: 136 = asng)",
+          "default": 136
         }
       },
       "required": []
@@ -171,7 +238,7 @@
   },
   {
     "name": "oms_login",
-    "description": "Check OMS login status",
+    "description": "Explicitly login to the OMS and establish a socket connection. Called automatically by other tools, but can be called manually to test connectivity.",
     "inputSchema": {
       "type": "object",
       "properties": {},
