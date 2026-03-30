@@ -3,7 +3,7 @@
 # This Dockerfile is designed for DigitalOcean App Platform deployment
 
 # Build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25.8-alpine AS builder
 
 # Install git (required for go mod download from GitHub)
 RUN apk add --no-cache git
